@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.32901.82
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{888888A0-9F3D-457C-B088-3A5042F75D52}") = "BookwormWordFinder", "BookwormWordFinder\BookwormWordFinder.pyproj", "{A09CCC1F-26BB-4D73-AE24-1DD5BF396DCE}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{12661CEB-F51D-478E-B041-29DB82207F86}"
+	ProjectSection(SolutionItems) = preProject
+		bookwormWords.txt = bookwormWords.txt
+		BookwormWordFinder\screenshot.png = BookwormWordFinder\screenshot.png
+		BookwormWordFinder\wordsBig.txt = BookwormWordFinder\wordsBig.txt
+		BookwormWordFinder\wordsCommon.txt = BookwormWordFinder\wordsCommon.txt
+	EndProjectSection
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{A09CCC1F-26BB-4D73-AE24-1DD5BF396DCE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A09CCC1F-26BB-4D73-AE24-1DD5BF396DCE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {610C1DB2-5E17-4980-8922-B652F842662C}
+	EndGlobalSection
+EndGlobal
