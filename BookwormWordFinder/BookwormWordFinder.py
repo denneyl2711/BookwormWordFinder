@@ -80,7 +80,8 @@ PRINTED_WORDS = 10 #prints this many words in the console (beginning of list of 
 TIME_BETWEEN_ATTACKS = 0.1
 
     
-#count number of each letter
+#count number of each letter in a word
+#ex. "Salads" would have ('s', 2), ('a', 2), ('l', 1), ('d', 1)
 #this class is used to help find the longest possible word
 class LetterAndCount:
     count = 0
@@ -198,33 +199,6 @@ def setup(autoInput, boardLetters):
 
     return (filtered_words, boardLetters)
 
-def verify_word(word, fancy_letter):
-    letter_count = 0
-    for letter in word:
-        if letter == fancy_letter.letter:
-            letter_count = letter_count + 1
-
-        if letter_count > fancy_letter.count:
-            return False
-    
-    return True
-
-def verify_words(words, fancyLetters):
-    any_removed = True
-    num_removed = 0
-
-    while (any_removed):
-        any_removed = False
-        
-        for word in words:
-            for fancy_letter in fancyLetters:
-                if not verify_word(word, fancy_letter) and word in words:
-                    words.remove(word)
-                    any_removed = True
-                    num_removed = num_removed + 1
-
-                    break
-
 def verify_words_new(words, letterBoard):
     any_removed = True
     num_removed = 0
@@ -270,7 +244,6 @@ def verify_word_new(word, letterBoard):
         tempLetterBoard[grid_y][grid_x] = list(('-', 0))
     return True
 
-
 def findLongestWord(autoInput, boardLetters):
     filtered_words, boardLetters = setup(autoInput, boardLetters)
 
@@ -307,6 +280,7 @@ def findLongestWord(autoInput, boardLetters):
     
     return (filtered_words, boardLetters)
 
+#qu is stored as a single tile in the Bookworm Games, so this function helps deal with that
 def fixQsInString(word):
     newWord = ""
 
@@ -698,65 +672,12 @@ def readGrid(letterBoard):#remove abnormal tiles, read the normal ones, then rea
     
     loopCount = readLettersImproved(letterBoard, min_confidence, loopCount, letterCount, 0, locked_tile_positions)[1]
 
-
-    #print(f"Took {loopCount} loops to fill the board")
+    logging.info(f"Took {loopCount} loops to fill the board")
 
     printListLetterBoard(letterBoard)
 
     return locked_tile_positions, abnormal_count
 
-def readLetters(letterBoard, min_confidence, loopCount, letterCount, abnormal_count, locked_tile_positions):
-    gameType = inGame()
-    while not gameType:
-        time.sleep(1)
-        gameType = inGame()
-
-    while letterCount < 16 - abnormal_count - len(locked_tile_positions): #forces program to keep reading until board is full
-                            #confidence in guess drops on every pass, intended to account for gems distorting the image
-        for letter in ASCII_LOWERCASE + str((gameType - 1) * '?'):#sloppy but it works, doesn't check for ? in Bookworm 1
-            if letterCount >= 16 - abnormal_count - len(locked_tile_positions):
-                break
-            points, confidence_list = readLetter(letter, min_confidence, locked_tile_positions)#points holds all the places (pixel positions) where this letter is found 
-
-            pointIndex = 0
-            for point in points:
-                grid_x, grid_y = clickToGrid(point[0], point[1]) #fill board with predicted letters from read function
-                
-                logging.info(f"Trying to add point [{grid_x}, {grid_y}]")
-                
-                if not letterBoard[grid_y][grid_x][0] == '-': #stops the program from reading the same letter over and over if a window is stopping it from clicking or something like that
-                    logging.info("         Spot is taken!")
-                    break
-                else:
-                    letterBoard[grid_y][grid_x][0] = letter
-                    letterBoard[grid_y][grid_x][1] = round(confidence_list[pointIndex], 2)
-
-                    pointIndex = pointIndex + 1
-                    letterCount = letterCount + 1
-
-                    logging.info("            Counted letter " + str(letterCount))
-                    logging.info("\n" + letterBoardString(letterBoard))
-
-        min_confidence = min_confidence - 0.1 #gradually reduce confidence in guesses
-        loopCount = loopCount + 1
-
-    return (letterCount, loopCount)
-
-def readLetter(letter, confidence_adjustment, locked_tile_positions):
-    findingLetters = True
-    points_list = []#list of all the points where this letter exists
-    confidence_list = []
-
-    while findingLetters and len(points_list) <= 16:#len argument because otherwise it gets stuck searching for letters when confidence is super low
-        info = clickLetterMaybe(letter, confidence_adjustment, locked_tile_positions) #info holds (confidence, pixel_x, pixel_y) where [1] and [2] are locations of the letter
-        findingLetters = info[1] #if x val is 0 (default value), no letter has been found
-        if info[1] != 0:
-            confidence_list.append(info[0])
-            points_list.append((info[1], info[2]))
-
-    return ((points_list, confidence_list))#return the list of points and their respective confidence ratings
-
-#----
 def readLettersImproved(letterBoard, min_confidence, loopCount, letterCount, abnormal_count, locked_tile_positions):#try to read letters at confidence .95, then 80,... etc.
                                         #if match, then decrease in confidence until no more match within that letter
                                         #should decrease the number of unneeded checks
@@ -1617,4 +1538,83 @@ def deprecated():#this is only here so I can wrap it up/condense it
     #            print(f"                Found letter {letter} with confidence {round(1.0 - confidence_adjustment, 2)}!")
     #            return (letter, (1 - confidence_adjustment) + problem_adjustment, pos)
     #    return None
+
+    ##def verify_word(word, fancy_letter):
+    #    letter_count = 0
+    #    for letter in word:
+    #        if letter == fancy_letter.letter:
+    #            letter_count = letter_count + 1
+
+    #        if letter_count > fancy_letter.count:
+    #            return False
+        
+    #    return True
+
+    #def verify_words(words, fancyLetters):
+    #    any_removed = True
+    #    num_removed = 0
+
+    #    while (any_removed):
+    #        any_removed = False
+            
+    #        for word in words:
+    #            for fancy_letter in fancyLetters:
+    #                if not verify_word(word, fancy_letter) and word in words:
+    #                    words.remove(word)
+    #                    any_removed = True
+    #                    num_removed = num_removed + 1
+
+    #                    break
+
+
+    #def readLetters(letterBoard, min_confidence, loopCount, letterCount, abnormal_count, locked_tile_positions):
+    #    gameType = inGame()
+    #    while not gameType:
+    #        time.sleep(1)
+    #        gameType = inGame()
+
+    #    while letterCount < 16 - abnormal_count - len(locked_tile_positions): #forces program to keep reading until board is full
+    #                            #confidence in guess drops on every pass, intended to account for gems distorting the image
+    #        for letter in ASCII_LOWERCASE + str((gameType - 1) * '?'):#sloppy but it works, doesn't check for ? in Bookworm 1
+    #            if letterCount >= 16 - abnormal_count - len(locked_tile_positions):
+    #                break
+    #            points, confidence_list = readLetter(letter, min_confidence, locked_tile_positions)#points holds all the places (pixel positions) where this letter is found 
+
+    #            pointIndex = 0
+    #            for point in points:
+    #                grid_x, grid_y = clickToGrid(point[0], point[1]) #fill board with predicted letters from read function
+                    
+    #                logging.info(f"Trying to add point [{grid_x}, {grid_y}]")
+                    
+    #                if not letterBoard[grid_y][grid_x][0] == '-': #stops the program from reading the same letter over and over if a window is stopping it from clicking or something like that
+    #                    logging.info("         Spot is taken!")
+    #                    break
+    #                else:
+    #                    letterBoard[grid_y][grid_x][0] = letter
+    #                    letterBoard[grid_y][grid_x][1] = round(confidence_list[pointIndex], 2)
+
+    #                    pointIndex = pointIndex + 1
+    #                    letterCount = letterCount + 1
+
+    #                    logging.info("            Counted letter " + str(letterCount))
+    #                    logging.info("\n" + letterBoardString(letterBoard))
+
+    #        min_confidence = min_confidence - 0.1 #gradually reduce confidence in guesses
+    #        loopCount = loopCount + 1
+
+    #    return (letterCount, loopCount)
+
+    #def readLetter(letter, confidence_adjustment, locked_tile_positions):
+    #    findingLetters = True
+    #    points_list = []#list of all the points where this letter exists
+    #    confidence_list = []
+
+    #    while findingLetters and len(points_list) <= 16:#len argument because otherwise it gets stuck searching for letters when confidence is super low
+    #        info = clickLetterMaybe(letter, confidence_adjustment, locked_tile_positions) #info holds (confidence, pixel_x, pixel_y) where [1] and [2] are locations of the letter
+    #        findingLetters = info[1] #if x val is 0 (default value), no letter has been found
+    #        if info[1] != 0:
+    #            confidence_list.append(info[0])
+    #            points_list.append((info[1], info[2]))
+
+    #    return ((points_list, confidence_list))#return the list of points and their respective confidence ratings
     pass
