@@ -164,22 +164,45 @@ def setup(autoInput, boardLetters):
             #need to append another letter for every time the program loops through the ? list
             #then remove/decrement that letter at the end
 
-            for fancyLetter in fancyLetters:
-                if fancyLetter.letter == letter:
-                    fancyLetter.count = fancyLetter.count + 1
-                    break
-            else:
-                fancyLetters.append(LetterAndCount(letter, 1))
 
-            verify_words(temp_filtered_words, fancyLetters)
+            #######################################################################################
+            #for fancyLetter in fancyLetters:
+            #    if fancyLetter.letter == letter:
+            #        fancyLetter.count = fancyLetter.count + 1
+            #        break
+            #else:
+            #    fancyLetters.append(LetterAndCount(letter, 1))
 
-            for fancyLetter in fancyLetters:
-                if fancyLetter.letter == letter:
-                    if fancyLetter.count == 1:
-                        fancyLetters.remove(fancyLetter)
-                    else:
-                        fancyLetter.count = fancyLetter.count - 1
-                    break
+            #verify_words_new(temp_filtered_words, fancyLetters)
+
+            #for fancyLetter in fancyLetters:
+            #    if fancyLetter.letter == letter:
+            #        if fancyLetter.count == 1:
+            #            fancyLetters.remove(fancyLetter)
+            #        else:
+            #            fancyLetter.count = fancyLetter.count - 1
+            #        break
+            #######################################################################################
+
+            #Make tempLetterBoard using the letters (except for ?), then append each individual letter on every pass
+            tempLetterBoard = [[list(('-', 0)), list(('-', 0)), list(('-', 0)), list(('-', 0))], 
+                              [list(('-', 0)), list(('-', 0)), list(('-', 0)), list(('-', 0))], 
+                              [list(('-', 0)), list(('-', 0)), list(('-', 0)), list(('-', 0))], 
+                              [list(('-', 0)), list(('-', 0)), list(('-', 0)), list(('-', 0))]]
+
+            row = 0
+            col = 0
+            for letter in tempBoardLetters + letter:
+                tempLetterBoard[col][row] = list((letter, 1))
+
+                row +=1
+                if row > 3:
+                    row = 0
+                    col += 1
+                if col > 3:
+                    col = 0
+
+            verify_words_new(temp_filtered_words, tempLetterBoard)
 
 
             filtered_words = list(set(filtered_words) | set(temp_filtered_words))
@@ -940,10 +963,11 @@ def checkForLocked():#TODO: PROGRAM SOMETIMES SEES THE BLACK PIXELS IN THE LETTE
         step = 93
 
     
-    col = 0
-    for x in range(x_min, x_max, step):
+    col = 0#scan from top to bottom instead of left to right
+    for y in range(y_min, y_max, step):
         row = 0
-        for y in range(y_min, y_max, step):
+        for x in range(x_min, x_max, step):
+       
             click_x = find_x(x)
             click_y = find_y(y)
             logging.debug("Entering info for cell (" + str(row) + " , " + str(col) + ")")
@@ -1308,6 +1332,28 @@ if __name__ == '__main__':
 
 ######################################################################################################
 #CODE TESTING SNIPPETS BELOW
+
+#tempLetterBoard = [[list(('-', 0)), list(('-', 0)), list(('-', 0)), list(('-', 0))], 
+#                              [list(('-', 0)), list(('-', 0)), list(('-', 0)), list(('-', 0))], 
+#                              [list(('-', 0)), list(('-', 0)), list(('-', 0)), list(('-', 0))], 
+#                              [list(('-', 0)), list(('-', 0)), list(('-', 0)), list(('-', 0))]]
+
+#tempBoardLetters = "abcdefghijkl"
+#letter = "?"
+
+#row = 0
+#col = 0
+#for letter in tempBoardLetters + letter:
+#    tempLetterBoard[col][row] = list((letter, 1))
+
+#    row +=1
+#    if row > 3:
+#        row = 0
+#        col += 1
+#    if col > 3:
+#        col = 0
+
+#printListLetterBoard(tempLetterBoard)
 
 #gameType = inGame()
 #while not gameType:
