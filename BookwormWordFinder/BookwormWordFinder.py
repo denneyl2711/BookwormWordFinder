@@ -57,6 +57,7 @@ from pynput.mouse import Controller, Button
 from threading import Thread
 import time
 import logging
+import copy
 
 import concurrent.futures
 from multiprocessing.pool import Pool
@@ -68,7 +69,7 @@ import pytesseract
 import cv2
 from PIL import ImageGrab
 
-logging.basicConfig(level = logging.INFO)
+logging.basicConfig(level = logging.DEBUG)
 
 WORD_LENGTH_MAX = 16
 WORD_LENGTH_MIN = 3
@@ -94,9 +95,102 @@ class LetterAndCount:
     def __lt__(self, other):
         return self.letter < other.letter
 
-    def to_string(self):
+    def __str__(self):
         return "Letter: " + self.letter + "\n" + "Count: " + str(self.count) + "\n"
 
+class Tile:
+    confidence = 0
+    letter = '-'
+    def __init__(self, *args):
+       if len(args) == 0:
+           self.confidence = 0
+           self.letter = '-'
+
+       else:
+           if isinstance(args[0], Tile):#if tile is argument
+               tile = args[0]
+               self.letter = tile.get_letter()
+               self.confidence = tile.get_confidence()
+               print("tile copy constructor")
+
+           if isinstance(args[0], str) and (isinstance(args[1], float) or isinstance(args[1], int)):#if (letter, confidence) is argument
+               self.letter = args[0]
+               self.confidence = args[1]
+       
+
+    def get_letter(self):
+        return self.letter
+   
+    def get_confidence(self):
+        return self.confidence
+
+    def set_letter(self, letter):
+        self.letter = letter
+
+    def set_confidence(self, confidence):
+        self.confidence = confidence
+
+    def __lt__(self, other):
+        return self.confidence < other.confidence
+
+    def __str__(self):
+        return f"Letter is {self.letter}, confidence is {self.confidence}."
+
+   
+
+class LetterBoard:
+    
+
+    def __init__(self, *args):
+        self.board = [[Tile() for i in range(4)] for j in range(4)]
+
+        if args:
+            if isinstance(args[0], str):
+                lettersQueue = []
+                letters = args[0]
+                letters = fixQsInString(letters)
+                    
+                for letter in letters:
+                    lettersQueue.append(letter)
+
+                
+                for i in range(4):
+                    for j in range(4):
+                        if lettersQueue:#if list is not long enough, append '-' chars to the end
+                            self.board[i][j] = Tile(lettersQueue.pop(0), 1)
+
+                        else:
+                            self.board[i][j] = Tile('-', 0)
+
+    def deep_copy(self):
+        new_board = LetterBoard()
+
+        for i in range(4):
+            for j in range(4):
+                new_letter = self.board[i][j].get_letter()
+                new_confidence = self.board[i][j].get_confidence()
+                new_board.board[i][j] = Tile(new_letter, new_confidence)
+
+        
+        return new_board
+
+    def __str__(self):
+        output = ""
+        for row in range(4):
+            output += "[ "
+            for col in range(4):
+                output += f" '{self.board[row][col].get_letter()}' "
+            output += "]\n"
+        output += '\n'
+        for row in range(4):
+            output += "[ "
+            for col in range(4):
+                if self.board[row][col].get_confidence() == 0:
+                    output += " --  "
+                else:
+                    output += "{:.2f}".format(self.board[row][col].get_confidence()) + ' '
+            output += "]\n"
+        return output
 
 def load_dictionary():
     with open(WORD_SOURCE) as word_file:
@@ -139,12 +233,10 @@ def setup(autoInput, boardLetters):
         regex = re.compile(pattern)
 
         filtered_words = list(filter(regex.search, english_words))
-        
     else:
         filtered_words = list()
         #run the same test 26 times with the ? being replaced with a new letter every time
         #note: if the letter is q, need to insert both a q and a u                            
-        fancyLetters = getFancyLetters(boardLetters) 
         
         num_removed = 0
         for letter in ASCII_LOWERCASE:
@@ -166,7 +258,8 @@ def setup(autoInput, boardLetters):
             #then remove/decrement that letter at the end
 
 
-            #######################################################################################
+           #######################################################################################
+
             #for fancyLetter in fancyLetters:
             #    if fancyLetter.letter == letter:
             #        fancyLetter.count = fancyLetter.count + 1
@@ -186,22 +279,7 @@ def setup(autoInput, boardLetters):
             #######################################################################################
 
             #Make tempLetterBoard using the letters (except for ?), then append each individual letter on every pass
-            tempLetterBoard = [[list(('-', 0)), list(('-', 0)), list(('-', 0)), list(('-', 0))], 
-                              [list(('-', 0)), list(('-', 0)), list(('-', 0)), list(('-', 0))], 
-                              [list(('-', 0)), list(('-', 0)), list(('-', 0)), list(('-', 0))], 
-                              [list(('-', 0)), list(('-', 0)), list(('-', 0)), list(('-', 0))]]
-
-            row = 0
-            col = 0
-            for letter in tempBoardLetters + letter:
-                tempLetterBoard[col][row] = list((letter, 1))
-
-                row +=1
-                if row > 3:
-                    row = 0
-                    col += 1
-                if col > 3:
-                    col = 0
+            tempLetterBoard = LetterBoard(tempBoardLetters + letter)
 
             verify_words_new(temp_filtered_words, tempLetterBoard)
 
@@ -244,14 +322,7 @@ def verify_word_new(word, letterBoard):
         word = fixQsInString(word)
 
     #don't want to change the inputted letterBoard, so create a copy
-    tempLetterBoard = [[list(('-', 0)), list(('-', 0)), list(('-', 0)), list(('-', 0))], 
-                       [list(('-', 0)), list(('-', 0)), list(('-', 0)), list(('-', 0))], 
-                       [list(('-', 0)), list(('-', 0)), list(('-', 0)), list(('-', 0))], 
-                       [list(('-', 0)), list(('-', 0)), list(('-', 0)), list(('-', 0))]]
-
-    for row in range(4):
-        for col in range(4):
-            tempLetterBoard[col][row] = letterBoard[col][row]
+    tempLetterBoard = letterBoard.deep_copy()
 
     for letter in word:
         #find the letter that has the highest confidence rating, then click that one
@@ -264,7 +335,9 @@ def verify_word_new(word, letterBoard):
             #logging.debug(f"Removed the word {word} while analyzing words")    
             return False
 
-        tempLetterBoard[grid_y][grid_x] = list(('-', 0))
+        tempLetterBoard.board[grid_y][grid_x] = Tile()
+
+       
     return True
 
 def findLongestWord(autoInput, boardLetters):
@@ -273,28 +346,11 @@ def findLongestWord(autoInput, boardLetters):
     #contains LetterAndCount objects, so letter:num pairs
     #ex. string "aabbbc" would have be (a, 2), (b, 3), (c, 1)
 
-    fancyLetters = getFancyLetters(boardLetters)    
-    fancyLetters.sort()
+    #fancyLetters = getFancyLetters(boardLetters)    
+    #fancyLetters.sort()
 
-    #TODO: THIS IS REPEATED CODE
-    tempLetterBoard = [[list(('-', 0)), list(('-', 0)), list(('-', 0)), list(('-', 0))], 
-                           [list(('-', 0)), list(('-', 0)), list(('-', 0)), list(('-', 0))], 
-                           [list(('-', 0)), list(('-', 0)), list(('-', 0)), list(('-', 0))], 
-                           [list(('-', 0)), list(('-', 0)), list(('-', 0)), list(('-', 0))]]
-    lettersQueue = []
-    tempBoardLetters = fixQsInString(boardLetters)
-    for i in tempBoardLetters:
-        lettersQueue.append(i)
-    
-    for i in range(4):
-        for j in range(4):
-            if lettersQueue:#if list is not long enough, append '-' chars to the end
-                tempLetterBoard[i][j][0] = lettersQueue.pop(0)
-                tempLetterBoard[i][j][1] = 1
+    tempLetterBoard = LetterBoard(boardLetters)
 
-            else:
-                tempLetterBoard[i][j][0] = '-'
-                        
     #remove words from long list
     start = time.perf_counter()
     verify_words_new(filtered_words, tempLetterBoard)
@@ -339,14 +395,17 @@ def spellWord(word, letterBoard, inOrder):
     if inOrder:
         #TODO: DON'T THINK I NEED A TEMP LETTERBOARD ANYMORE, NEED TO VERIFY
         #don't want to change the inputted letterBoard, so create a copy
-        tempLetterBoard = [[list(('-', 0)), list(('-', 0)), list(('-', 0)), list(('-', 0))], 
-                           [list(('-', 0)), list(('-', 0)), list(('-', 0)), list(('-', 0))], 
-                           [list(('-', 0)), list(('-', 0)), list(('-', 0)), list(('-', 0))], 
-                           [list(('-', 0)), list(('-', 0)), list(('-', 0)), list(('-', 0))]]
+        #tempLetterBoard = [[list(('-', 0)), list(('-', 0)), list(('-', 0)), list(('-', 0))], 
+        #                   [list(('-', 0)), list(('-', 0)), list(('-', 0)), list(('-', 0))], 
+        #                   [list(('-', 0)), list(('-', 0)), list(('-', 0)), list(('-', 0))], 
+        #                   [list(('-', 0)), list(('-', 0)), list(('-', 0)), list(('-', 0))]]
 
-        for row in range(4):
-            for col in range(4):
-                tempLetterBoard[col][row] = letterBoard[col][row]
+        #for row in range(4):
+        #    for col in range(4):
+        #        tempLetterBoard[col][row] = letterBoard[col][row]
+        
+
+        tempLetterBoard = copy.deepcopy(letterBoard)
 
         for letter in word:
             #find letter in tempLetterBoard
@@ -377,7 +436,7 @@ def spellWord(word, letterBoard, inOrder):
 
             #modify letterBoard
             grid_x, grid_y = clickToGrid(info[1], info[2])
-            letterBoard[grid_y][grid_x] = list((letter, 1))
+            letterBoard.board[grid_y][grid_x] = list((letter, 1))
 
             count = count + 1
 
@@ -678,11 +737,11 @@ def readGrid(letterBoard):#remove abnormal tiles, read the normal ones, then rea
         for row in range(4):
             for col in range(4):
                 #if tile has been read already, it must be a 'normal' tile. Has a confidence != 0
-                if letterBoard[col][row][1] != 0:
+                if letterBoard.board[col][row].get_confidence() != 0:
                     clickLetterWithCoords(row, col)
 
     print("Before reading abnormal letters: ...")
-    printListLetterBoard(letterBoard)
+    print(letterBoard)
     print()
 
     min_confidence = 0.9
@@ -697,9 +756,10 @@ def readGrid(letterBoard):#remove abnormal tiles, read the normal ones, then rea
 
     logging.info(f"Took {loopCount} loops to fill the board")
 
-    printListLetterBoard(letterBoard)
+    print(letterBoard)
 
     return locked_tile_positions, abnormal_count
+
 
 def readLettersImproved(letterBoard, min_confidence, loopCount, letterCount, abnormal_count, locked_tile_positions):#try to read letters at confidence .95, then 80,... etc.
                                         #if match, then decrease in confidence until no more match within that letter
@@ -743,17 +803,17 @@ def readLettersImproved(letterBoard, min_confidence, loopCount, letterCount, abn
 
             logging.info(f"Trying to add letter '{letter}' in position [{grid_x}, {grid_y}]")
                 
-            if not letterBoard[grid_y][grid_x][0] == '-': #stops the program from reading the same letter over and over if a window is stopping it from clicking or something like that
+            if not letterBoard.board[grid_y][grid_x].get_letter() == '-': #stops the program from reading the same letter over and over if a window is stopping it from clicking or something like that
                 logging.warning("         Spot is taken!")
                 continue
             else:
-                letterBoard[grid_y][grid_x][0] = letter
-                letterBoard[grid_y][grid_x][1] = round(letter_confidence, 2)
+                letterBoard.board[grid_y][grid_x].set_letter(letter)
+                letterBoard.board[grid_y][grid_x].set_confidence(round(letter_confidence, 2))
 
                 letterCount = letterCount + 1
 
                 logging.info("            Counted letter " + str(letterCount))
-                logging.info("\n" + letterBoardString(letterBoard))
+                logging.info("\n" + letterBoard.__str__())
                 clickLetterWithCoords(grid_x, grid_y)
 
 
@@ -888,7 +948,7 @@ def checkForLocked():#TODO: PROGRAM SOMETIMES SEES THE BLACK PIXELS IN THE LETTE
     for y in range(y_min, y_max, step):
         row = 0
         for x in range(x_min, x_max, step):
-       
+
             click_x = find_x(x)
             click_y = find_y(y)
             logging.debug("Entering info for cell (" + str(row) + " , " + str(col) + ")")
@@ -976,27 +1036,6 @@ def clickAbnormalTiles():#clicks on the tiles which are gems, plagued, smashed, 
     print(str(abnormal_count) + " abnormal tiles")
     return abnormal_count
 
-def printListLetterBoard(board):#first print letters, then print confidence levels in a separate grid
-    print(letterBoardString(board))
-
-def letterBoardString(board):
-    output = ""
-    for row in range(4):
-        output += "[ "
-        for col in range(4):
-            output += f" '{board[row][col][0]}' "
-        output += "]\n"
-    output += '\n'
-    for row in range(4):
-        output += "[ "
-        for col in range(4):
-            if board[row][col][1] == 0:
-                output += " --  "
-            else:
-                output += "{:.2f}".format(board[row][col][1]) + ' '
-        output += "]\n"
-
-    return output
 def getLetterAdjustment(letter):
     gameType = inGame()
     while not gameType:
@@ -1043,13 +1082,13 @@ def getMostConfidentLetterGrid(letter, letterBoard):#return the grid location of
 
     for col in range (4):
         for row in range(4):
-            if letterBoard[col][row][0] == letter:
+            if letterBoard.board[col][row].get_letter() == letter:
                 #print("letter " + letter + " in position (" + str(row) + ", " + str(col) + ")")
                 
                 #find the letter that has the highest confidence rating, then click that one
-                lettersToClick.append((letterBoard[col][row], row, col))
-            elif letterBoard[col][row][0] == '?':
-                lettersToClick.append((list((letter, 0.01)), row, col))
+                lettersToClick.append((letterBoard.board[col][row], row, col))
+            elif letterBoard.board[col][row].get_letter() == '?':
+                lettersToClick.append((Tile(letter, 0.01), row, col))
 
     lettersToClick.sort(key = lambda x : x[0], reverse = True)
 
@@ -1057,13 +1096,13 @@ def getMostConfidentLetterGrid(letter, letterBoard):#return the grid location of
     #print(lettersToClick)
 
     if not lettersToClick:
-        return list(('-', 0))
+        return Tile()
 
     bestLetter = lettersToClick[0]
                     
     bestRow, bestCol = bestLetter[1], bestLetter[2]
 
-    letterBoard[bestCol][bestRow] = list(('-', 0))
+    letterBoard.board[bestCol][bestRow] = Tile()
 
     return (bestLetter)
 
@@ -1120,10 +1159,11 @@ def main():
     locked_tile_positions = []
     abnormal_count = -1
 
-    letterBoard = [[list(('-', 0)), list(('-', 0)), list(('-', 0)), list(('-', 0))], 
-                   [list(('-', 0)), list(('-', 0)), list(('-', 0)), list(('-', 0))], 
-                   [list(('-', 0)), list(('-', 0)), list(('-', 0)), list(('-', 0))], 
-                   [list(('-', 0)), list(('-', 0)), list(('-', 0)), list(('-', 0))]]
+    #letterBoard = [[list(('-', 0)), list(('-', 0)), list(('-', 0)), list(('-', 0))], 
+    #               [list(('-', 0)), list(('-', 0)), list(('-', 0)), list(('-', 0))], 
+    #               [list(('-', 0)), list(('-', 0)), list(('-', 0)), list(('-', 0))], 
+    #               [list(('-', 0)), list(('-', 0)), list(('-', 0)), list(('-', 0))]]
+    letterBoard = LetterBoard()
     boardLetters = ""
 
 
@@ -1146,22 +1186,9 @@ def main():
 
         if inOrder:
             #fill letterboard completely
-            lettersQueue = []
-            boardLetters = fixQsInString(boardLetters)
-            for i in boardLetters:
-                lettersQueue.append(i)
-            
-            for i in range(4):
-                for j in range(4):
-                    if lettersQueue:#if list is not long enough, append '-' chars to the end
-                        letterBoard[i][j][0] = lettersQueue.pop(0)
-                        letterBoard[i][j][1] = 1
+           letterBoard = LetterBoard(boardLetters)
 
-                    else:
-                        letterBoard[i][j][0] = '-'
-
-
-        printListLetterBoard(letterBoard)
+        print(letterBoard)
  
 
     else:#automated input
@@ -1182,8 +1209,8 @@ def main():
         autoInput = ""
         for i in range(4):
             for j in range(4):
-                if letterBoard[i][j][0] != '-':
-                    autoInput = autoInput + letterBoard[i][j][0]
+                if letterBoard.board[i][j].get_letter() != '-':
+                    autoInput = autoInput + letterBoard.board[i][j].get_letter()
 
         start = time.perf_counter()
         filtered_words = findLongestWord(autoInput, boardLetters)[0]
@@ -1253,6 +1280,31 @@ if __name__ == '__main__':
 
 ######################################################################################################
 #CODE TESTING SNIPPETS BELOW
+
+
+
+#letterBoard = LetterBoard("boardgame")
+#print(letterBoard)
+
+#newBoard = copy.deepcopy(letterBoard)
+#print(newBoard)
+
+#letterBoard.board[3][3].set_letter('f')
+#print(letterBoard)
+
+#letterAndCount = LetterAndCount('a', 1)
+#print(letterAndCount)
+#tile = Tile()
+#print(f"Printing blank tile:\n{tile}")
+
+#filledTile = Tile('a', 0.83)
+#print(f"Printing filled tile:\n{filledTile}")
+#board = LetterBoard()
+#print(board)
+
+#filledBoard = LetterBoard("oadofkjsdokfna;sodkfn;aoskdnfansdofi")
+#print(filledBoard)
+
 
 #tempLetterBoard = [[list(('-', 0)), list(('-', 0)), list(('-', 0)), list(('-', 0))], 
 #                              [list(('-', 0)), list(('-', 0)), list(('-', 0)), list(('-', 0))], 
@@ -1585,7 +1637,29 @@ def deprecated():#this is only here so I can wrap it up/condense it
     #            return (letter, (1 - confidence_adjustment) + problem_adjustment, pos)
     #    return None
 
-    ##def verify_word(word, fancy_letter):
+    #def printListLetterBoard(board):#first print letters, then print confidence levels in a separate grid
+    #    print(letterBoardString(board))
+
+    #def letterBoardString(board):
+    #    output = ""
+    #    for row in range(4):
+    #        output += "[ "
+    #        for col in range(4):
+    #            output += f" '{board[row][col][0]}' "
+    #        output += "]\n"
+    #    output += '\n'
+    #    for row in range(4):
+    #        output += "[ "
+    #        for col in range(4):
+    #            if board[row][col][1] == 0:
+    #                output += " --  "
+    #            else:
+    #                output += "{:.2f}".format(board[row][col][1]) + ' '
+    #        output += "]\n"
+
+    #    return output
+
+    #def verify_word(word, fancy_letter):
     #    letter_count = 0
     #    for letter in word:
     #        if letter == fancy_letter.letter:
@@ -1611,8 +1685,7 @@ def deprecated():#this is only here so I can wrap it up/condense it
     #                    num_removed = num_removed + 1
 
     #                    break
-
-
+    
     #def readLetters(letterBoard, min_confidence, loopCount, letterCount, abnormal_count, locked_tile_positions):
     #    gameType = inGame()
     #    while not gameType:
