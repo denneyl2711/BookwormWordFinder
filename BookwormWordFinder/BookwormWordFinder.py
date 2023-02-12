@@ -69,7 +69,12 @@ import pytesseract
 import cv2
 from PIL import ImageGrab
 
-logging.basicConfig(level = logging.DEBUG)
+logging.basicConfig(level = logging.INFO)
+#INFO prints out board states as the program reads the board, 
+    #also the number of words removed while searching for longest word
+    #also miscellaneous info which is only printed a few times
+#DEBUG prints out individual letter confidences as it tries to read them
+    #also info for the 2d color array in checkForLocked(info for the 2d color array in checkForLocked()
 
 WORD_LENGTH_MAX = 16
 WORD_LENGTH_MIN = 3
@@ -96,7 +101,7 @@ class LetterAndCount:
         return self.letter < other.letter
 
     def __str__(self):
-        return "Letter: " + self.letter + "\n" + "Count: " + str(self.count) + "\n"
+        return f"Letter: {self.letter}\nCount: {self.count}\n"
 
 class Tile:
     confidence = 0
@@ -260,7 +265,7 @@ def setup(autoInput, boardLetters):
             #print(f"list is now {len(filtered_words)} words long")
 
         end = time.perf_counter()
-        print(f"Took {end-start} seconds to run regex and take out {num_removed} words")
+        print(f"Took {end-start} seconds to run regex (and other take other measures), removing {num_removed} words")
         
 
     filtered_words.sort(key =len, reverse = True) #sort by length, longer words first
@@ -404,28 +409,14 @@ def clickLetterForce(letter):
         time.sleep(1)
         gameType = inGame()
 
+    x_min, y_min, x_max, y_max, offset, step, SCALER = getBoundaries(gameType)
     if gameType == 1:
-        x_min = 310
-        y_min = 320
-
-        x_max = 510
-        y_max = 520
-
-        offset = 20
         append = "Clear.png"
-        SCALER = 1.5
 
     if gameType == 2:
-        x_min = 770
-        y_min = 550
-
-        x_max = 1150
-        y_max = 950
-
-        offset = 50
         append = "2Clear.png"
-        SCALER = 1
 
+    boundaries = (x_min - offset, y_min - offset, x_max - x_min + offset, y_max - y_min + offset)
 
     pos = None
     confidence_adjustment = 0
@@ -437,7 +428,7 @@ def clickLetterForce(letter):
 
     while(pos == None):#forces it to find a letter, may click wrong letter
         logging.debug(f"checking {letter} with confidence {round(1.0 - confidence_adjustment, 2)}...")
-        pos = pyautogui.locateOnScreen(letterName, region = (x_min - offset, y_min - offset, x_max - x_min + offset, y_max - y_min + offset), confidence = 1.0 - confidence_adjustment)
+        pos = pyautogui.locateOnScreen(letterName, region = boundaries, confidence = 1.0 - confidence_adjustment)
         confidence_adjustment = confidence_adjustment + 0.01 #slowly decreases the confidence of the check
 
     print("Confidence in letter " + letter + ": " + str(1.0 - confidence_adjustment))
@@ -458,35 +449,20 @@ def clickLetterMaybe(letter, min_confidence, locked_tile_positions): #will not c
                                                     #ex. (0.67, 356, 258)
 
 
-    #TODO: REMOVE REPETITION HERE
     gameType = inGame()
     while not gameType:
         time.sleep(1)
         gameType = inGame()
 
+    x_min, y_min, x_max, y_max, offset, step, SCALER = getBoundaries(gameType)
+
     if gameType == 1:
-        x_min = 310
-        y_min = 320
-
-        x_max = 510
-        y_max = 520
-
-        offset = 20
-        SCALER = 1.5
         append = "Clear.png"#this is appened to the letter so the program can search for the file name
 
-
     if gameType == 2:
-        x_min = 770
-        y_min = 550
-
-        x_max = 1150
-        y_max = 950
-
-        offset = 50
-        SCALER = 1
         append = "2Clear.png"#this is appened to the letter so the program can search for the file name
 
+    boundaries = (x_min - offset, y_min - offset, x_max - x_min + offset, y_max - y_min + offset)
 
     #problem_adjustment is a skewing done because some letters are recognized more often / less often than they should be
     #program very commonly confuses i's for t's, etc without this adjustment
@@ -496,7 +472,6 @@ def clickLetterMaybe(letter, min_confidence, locked_tile_positions): #will not c
         letter = "question"#have to make this change because you can't name a file '?2.png'
 
     letterName = letter + append
-    pos = None
     confidence_adjustment = 0.9 - (min_confidence - problem_adjustment)
 
     if confidence_adjustment < 0:
@@ -504,10 +479,10 @@ def clickLetterMaybe(letter, min_confidence, locked_tile_positions): #will not c
 
     #right side of this inequality determines how far the program goes before giving up
     #the higher the right side is, the further it allows its guesses to stray from the confidence
-
+    pos = None
     while(1 - confidence_adjustment + problem_adjustment > min_confidence and pos == None):#DOES NOT have to click a letter
         logging.debug(f"checking {letter} with confidence {round(1.0 - confidence_adjustment, 2)}...")
-        pos = pyautogui.locateOnScreen(letterName, region = (x_min - offset, y_min - offset, x_max - x_min + offset, y_max - y_min + offset), confidence = 1.0 - confidence_adjustment)
+        pos = pyautogui.locateOnScreen(letterName, region = boundaries, confidence = 1.0 - confidence_adjustment)
 
         if pos!= None:
             logging.debug(f"                Found letter {letter} with confidence {round(1.0 - confidence_adjustment, 2)}!")
@@ -768,25 +743,13 @@ def readLetterImproved(letter, min_confidence, locked_tile_positions):
         time.sleep(1)
         gameType = inGame()
 
+    x_min, y_min, x_max, y_max, offset, step, SCALER = getBoundaries(gameType)
+    boundaries = (x_min - offset, y_min - offset, x_max - x_min + offset, y_max - y_min + offset)
+
     if gameType == 1:
-        x_min = 310
-        y_min = 320
-
-        x_max = 510
-        y_max = 520
-
-        offset = 20
         append = "Clear.png"#this is appened to the letter so the program can search for the file name
 
-
     if gameType == 2:
-        x_min = 770
-        y_min = 550
-
-        x_max = 1150
-        y_max = 950
-
-        offset = 50
         append = "2.png"#this is appended to the letter so the program can search for the file name
 
     problem_adjustment = getLetterAdjustment(letter)
@@ -804,7 +767,7 @@ def readLetterImproved(letter, min_confidence, locked_tile_positions):
     pos_list = []
     while(pos != None):#searches until it doesn't find a match
         logging.debug(f"checking {orig_letter} with confidence {round(1.0 - confidence_adjustment, 2)}...")
-        pos = pyautogui.locateOnScreen(letterName, region = (x_min - offset, y_min - offset, x_max - x_min + offset, y_max - y_min + offset), confidence = 1.0 - confidence_adjustment)
+        pos = pyautogui.locateOnScreen(letterName, region = boundaries, confidence = 1.0 - confidence_adjustment)
 
         if pos!= None:
             #only add pos if it is not a duplicate of other ones
@@ -816,7 +779,6 @@ def readLetterImproved(letter, min_confidence, locked_tile_positions):
                 if pos_x_grid == position_x_grid and pos_y_grid == position_y_grid:
                    logging.debug("Removed duplicate in readLetterImproved()!")
                    break
-                   pass
             else:
                 pos_list.append((pos_x_grid, pos_y_grid))
         confidence_adjustment = confidence_adjustment - 0.01 #slowly decreases the confidence of the check
@@ -854,31 +816,21 @@ def checkForLocked():
         time.sleep(1)
         gameType = inGame()
 
+    x_min, y_min, x_max, y_max, offset, step, SCALER = getBoundaries(gameType)
+    #checkForLocked() boundaries are different because getBoundaries() gives boundaries slightly outside of the board
+    x_min += 30
+    y_min += 20
+    x_max -= 50
+    y_max -= 90
+
     if gameType == 1:
-        x_min = 310
-        y_min = 320
-
-        x_max = 510
-        y_max = 520
-
         find_x = lambda x : round((x * 1.5))
         find_y = lambda y : round((y * 1.5) + 50)
 
-        step = 50
-    #TODO: STANDARDISE THIS BOUNDARY THING
     if gameType == 2:
-        x_min = 800
-        y_min = 570
-
-        x_max = 1100
-        y_max = 860
-
         find_x = lambda x : x - 12
         find_y = lambda y : y - 5
 
-        step = 93
-
-    
     col = 0#scan from top to bottom instead of left to right
     for y in range(y_min, y_max, step):
         row = 0
@@ -910,7 +862,7 @@ def checkForLocked():
             color = (0, 0, 0)
 
             other_color = pyautogui.pixel(x, y)
-            print(f"  expected {color} and saw {other_color} in position (" + str(col) + ", " + str(row) + ")")
+            logging.info(f"  expected {color} and saw {other_color} in position (" + str(col) + ", " + str(row) + ")")
 
             if not pyautogui.pixelMatchesColor(x, y, (color), tolerance = 35):
                 locked_count = locked_count + 1
@@ -928,32 +880,22 @@ def clickAbnormalTiles():#clicks on the tiles which are gems, plagued, smashed, 
     while not gameType:
         time.sleep(1)
         gameType = inGame()
+
+    x_min, y_min, x_max, y_max, offset, step, SCALER = getBoundaries(gameType)
+
+    #abnormalTiles() boundaries are different because getBoundaries() gives boundaries slightly outside of the board
+    x_min += 30
+    y_min += 20
+    x_max -= 50
+    y_max -= 90
+
     if gameType == 1:
-        x_min = 310
-        y_min = 320
-
-        x_max = 510
-        y_max = 520
-
         find_x = lambda x : round((x * 1.5))
         find_y = lambda y : round((y * 1.5) + 50)
 
-        step = 50
-
     if gameType == 2:
-        x_min = 800
-        y_min = 570
-
-        x_max = 1100
-        y_max = 860
-
         find_x = lambda x : x
         find_y = lambda y : y 
-
-        step = 93
-
-    pic = pyautogui.screenshot(region = (x_min, y_min, x_max - x_min, y_max - y_min))
-    
 
     for x in range(x_min, x_max, step):
         for y in range(y_min, y_max, step):
@@ -969,7 +911,7 @@ def clickAbnormalTiles():#clicks on the tiles which are gems, plagued, smashed, 
                 print(f"Abnormal color found: {pyautogui.pixel(x, y)} in position ({grid_x}, {grid_y}) (tile color is {tile_color})")
                 mouseSetAndClick(click_x, click_y)
                 abnormal_count = abnormal_count + 1
-    print(str(abnormal_count) + " abnormal tiles")
+    print(f"{abnormal_count} abnormal tiles")
     return abnormal_count
 
 def getLetterAdjustment(letter):
@@ -1065,16 +1007,43 @@ def inGame():
     #color of corner in the second edition is (0, 0, 0) because the game processes resolution differently 
                #(adds black bars but doesn't change resolution like 1st edition does)
 
-    #so, find the color of (270, 30) because this color always remains the same in the game (color of Lex's name, decorative)
+    #so, find the color in location (270, 30) because this color always remains the same in the game (color of Lex's name, decorative)
 
-    if pyautogui.pixelMatchesColor(0, 0, (115, 109, 90)):
+    bookworm_1_color =(115, 109, 90)
+    bookworm_2_color = (239, 178, 0)
+    if pyautogui.pixelMatchesColor(0, 0, bookworm_1_color):
         return 1
-    elif pyautogui.pixelMatchesColor(270, 30, (239, 178, 0), tolerance = 15):
+    elif pyautogui.pixelMatchesColor(270, 30, bookworm_2_color, tolerance = 15):
         return 2
     else:
         #print(f"Color was {pyautogui.pixel(270, 30)}, expected (239, 178, 0)")
         return 0
 
+def getBoundaries(gameType):
+    if gameType == 1:
+        x_min = 310
+        y_min = 320
+
+        x_max = 510
+        y_max = 520
+
+        offset = 20
+        step = 50
+        SCALER = 1.5
+
+    if gameType == 2:
+        x_min = 770
+        y_min = 550
+
+        x_max = 1150
+        y_max = 950
+
+        offset = 50
+        step = 93
+        SCALER = 1
+
+    #return (x_min - offset, y_min - offset, x_max - x_min + offset, y_max - y_min + offset)
+    return (x_min, y_min, x_max, y_max, offset, step, SCALER)
 def mouseSetAndClick(x, y):
     win32api.SetCursorPos((round(x), round(y)))
 
@@ -1199,7 +1168,7 @@ def main():
     logging.info(f"This board has {len(locked_tile_positions)} locked tiles and {abnormal_count} abnormal tiles")
     print()
     print("Attack successful! ----> " + attack_word)
-    print("Took " + str(numberOfAttempts) + " attempts")
+    print(f"Took {numberOfAttempts} attempts")
 
 #&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
 #&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
@@ -1207,463 +1176,3 @@ def main():
 if __name__ == '__main__':
     main()
    
-
-######################################################################################################
-#CODE TESTING SNIPPETS BELOW
-
-
-
-#letterBoard = LetterBoard("boardgame")
-#print(letterBoard)
-
-#newBoard = copy.deepcopy(letterBoard)
-#print(newBoard)
-
-#letterBoard.board[3][3].set_letter('f')
-#print(letterBoard)
-
-#letterAndCount = LetterAndCount('a', 1)
-#print(letterAndCount)
-#tile = Tile()
-#print(f"Printing blank tile:\n{tile}")
-
-#filledTile = Tile('a', 0.83)
-#print(f"Printing filled tile:\n{filledTile}")
-#board = LetterBoard()
-#print(board)
-
-#filledBoard = LetterBoard("oadofkjsdokfna;sodkfn;aoskdnfansdofi")
-#print(filledBoard)
-
-
-#tempLetterBoard = [[list(('-', 0)), list(('-', 0)), list(('-', 0)), list(('-', 0))], 
-#                              [list(('-', 0)), list(('-', 0)), list(('-', 0)), list(('-', 0))], 
-#                              [list(('-', 0)), list(('-', 0)), list(('-', 0)), list(('-', 0))], 
-#                              [list(('-', 0)), list(('-', 0)), list(('-', 0)), list(('-', 0))]]
-
-#tempBoardLetters = "abcdefghijkl"
-#letter = "?"
-
-#row = 0
-#col = 0
-#for letter in tempBoardLetters + letter:
-#    tempLetterBoard[col][row] = list((letter, 1))
-
-#    row +=1
-#    if row > 3:
-#        row = 0
-#        col += 1
-#    if col > 3:
-#        col = 0
-
-#printListLetterBoard(tempLetterBoard)
-
-#gameType = inGame()
-#while not gameType:
-#    time.sleep(1)
-#    gameType = inGame()
-
-#letterBoard = [[list(('-', 0)), list(('-', 0)), list(('-', 0)), list(('-', 0))], 
-#                   [list(('-', 0)), list(('-', 0)), list(('-', 0)), list(('-', 0))], 
-#                   [list(('-', 0)), list(('-', 0)), list(('-', 0)), list(('-', 0))], 
-#                   [list(('-', 0)), list(('-', 0)), list(('-', 0)), list(('-', 0))]]
-
-
-#clearBoard()
-#locked_tile_positions = []
-#abnormal_count = clickAbnormalTiles()
-
-#readLettersImproved(letterBoard, abnormal_count, locked_tile_positions)
-
-#printListLetterBoard(letterBoard)
-
-#if gameType == 1:
-#    x_min = 310
-#    y_min = 320
-#    x_max = 510
-#    y_max = 520
-
-#    offset = 10
-
-#if gameType == 2:
-#    x_min = 770
-#    y_min = 550
-#    x_max = 1150
-#    y_max = 930
-
-#    offset = 0
-
-#pic = pyautogui.screenshot('screenshot.png', region = (x_min - offset, y_min - offset, x_max - x_min + offset, y_max - y_min + offset))
-
-   
-def deprecated():#this is only here so I can wrap it up/condense it
-    
-    #####################################################################################
-
-    #if __name__ == '__main__':
-    #    main()
-        
-    #gameType = inGame()
-    #while not gameType:
-    #    time.sleep(1)
-    #    gameType = inGame()
-    #if gameType == 1:
-    #    x_min = 310
-    #    y_min = 320
-
-    #    x_max = 510
-    #    y_max = 520
-
-    #    offset = 20
-    #    SCALER = 1.5
-    #    append = "Clear.png"#this is appened to the letter so the program can search for the file name
-
-
-    #if gameType == 2:
-    #    x_min = 770
-    #    y_min = 550
-
-    #    x_max = 1150
-    #    y_max = 950
-
-    #    offset = 50
-    #    SCALER = 1
-    #    append = "2.png"#this is appened to the letter so the program can search for the file name
-    #    find_x = lambda x:x
-    #    find_y = lambda y:y
-    #pic = pyautogui.screenshot(region = (x_min, y_min, x_max - x_min, y_max - y_min))
-
-    #step = 100
-    #for x in range(x_min, x_max, step):
-    #    for y in range(y_min, y_max, step):
-    #        click_x = find_x(x)
-    #        click_y = find_y(y)
-
-    #        win32api.SetCursorPos((click_x, click_y))
-    #        grid_x, grid_y = clickToGrid(click_x, click_y)
-    #        print(f"Clicking in position ({grid_x}, {grid_y})")
-    #    print()
-
-
-    #thread = CustomThread(target = add, args = (7, 4))
-    #thread.start()
-    #print(thread.join())
-
-    #pool = ThreadPoolExecutor(5)
-
-    #while not inGame():
-    #    time.sleep(1)
-
-    #letterBoard = [[list(('-', 0)), list(('-', 0)), list(('-', 0)), list(('-', 0))], 
-    #               [list(('-', 0)), list(('-', 0)), list(('-', 0)), list(('-', 0))], 
-    #               [list(('-', 0)), list(('-', 0)), list(('-', 0)), list(('-', 0))], 
-    #               [list(('-', 0)), list(('-', 0)), list(('-', 0)), list(('-', 0))]]
-
-    #letterCount = 0
-    #while letterCount <16:
-    #    threads = []
-    #    potentialLetters = []
-
-    #    for letter in ASCII_LOWERCASE:
-    #        t = CustomThread(target = checkForLetterThread, args = (letter, ))
-    #        t.start()
-    #        threads.append(t)
-
-    #    for thread in threads:
-    #        potentialLetters.append(thread.join())
-
-    #    nonesRemoved = False
-    #    while not nonesRemoved:
-    #        nonesRemoved = True
-    #        for element in potentialLetters:
-    #            if element == None:
-    #                potentialLetters.remove(element)
-    #                nonesRemoved = False
-
-    #    print(potentialLetters)
-
-
-    #    if len(potentialLetters):
-    #        potentialLetters.sort(key = lambda x : x[1], reverse = True)
-    #        for letter in potentialLetters:
-    #            print("(" + letter[0] + ", " + str(round(letter[1], 2)) + ")", end = ", ")
-    #        print()
-    #        bestLetter = potentialLetters[0]
-
-    #        theLetter = (bestLetter[0])[0]
-    #        confidence = bestLetter[1]
-    #        pos = bestLetter[2]
-            
-    #        center_pos = pyautogui.center(pos)
-    #        new_pos_x, new_pos_y = center_pos
-
-    #        SCALER = 1.5
-    #        new_pos_x = new_pos_x * SCALER
-    #        new_pos_y = new_pos_y * SCALER
-
-    #        letter_x_grid, letter_y_grid = clickToGrid(new_pos_x, new_pos_y)
-    #        #print("Letter resides in position (" + str(letter_x_grid) + ", " + str(letter_y_grid) + ")")
-
-    #        ##if letter is on a locked tile, discard it
-    #        #if ((letter_x_grid, letter_y_grid)) in locked_tile_positions:
-    #        #    print("         That's a locked tile!")
-    #        #    return ((1.0 - confidence_adjustment, 0, 0)) #default return values
-
-    #        #else:
-    #        print("Confidence in letter " + theLetter + ": " + str(confidence))
-    #        letterCount = letterCount + 1
-
-    #        letterBoard[letter_y_grid][letter_x_grid][0] = theLetter
-    #        letterBoard[letter_y_grid][letter_x_grid][1] = confidence
-        
-    #        mouseSetAndClick(new_pos_x, new_pos_y)#because window resizing does weird things
-
-    #        printListLetterBoard(letterBoard)
-    #    else:
-    #        min_confidence = min_confidence - 0.04
-
-
-    #for i in range(50):
-    #    t = CustomThread(target = square, args = (i, ))
-    #    t.start()
-    #    threads.append(t)
-
-    #for thread in threads:
-    #    thread.join()
-
-    #thread1 = pool.submit(square, 1)
-    #thread2 = pool.submit(square, 2)
-    #thread3 = pool.submit(square, 3)
-    #thread4 = pool.submit(square, 4)
-    #thread5 = pool.submit(square, 5)
-
-    #0000000000000000000000000000000000000000000000000000000000000000
-
-    #attempted to speed up the process and increase the confidence of letters with multiprocessing, was a bit slower and reliability did not improve :(
-    #def readLetterNew(letterBoard):
-    #    #TODO:NEED TO GIVE THIS FUNCTION A BETTER NAME
-
-    #    #loop through all letters with one confidence level
-    #    #if theres a hit
-    #    #   sort hits by confidence and return the most confident
-    #    min_confidence = 0.95
-    #    confidence_adjustment = 0
-
-    #    letterCount = 0
-    #    while letterCount < 16:
-     
-    #        potentialLetters = []
-
-    #        items = [(letter, min_confidence) for letter in ASCII_LOWERCASE]
-
-    #        with Pool() as pool:
-    #            for result in pool.starmap(checkForLetterProcess, items):
-    #                if result!= None:
-    #                    potentialLetters.append(result)
-
-    #        print("         finished this pass")
-
-    #        #nonesRemoved = False
-    #        #while not nonesRemoved:
-    #        #    nonesRemoved = True
-    #        #    for element in potentialLetters:
-    #        #        if element == None:
-    #        #            potentialLetters.remove(element)
-    #        #            nonesRemoved = False
-
-    #            ##print("1 - confidence_adjustment = " + str(1 - confidence_adjustment) + " and min_confidence is " + str(min_confidence))
-    #            #while(1 - confidence_adjustment + problem_adjustment > min_confidence and pos == None):#DOES NOT have to click a letter
-    #            #    pos = pyautogui.locateOnScreen(letterName, region = (300, 290, 250, 250), confidence = 1.0 - confidence_adjustment)
-    #            #    confidence_adjustment = confidence_adjustment + 0.01 #slowly decreases the confidence of the check
-    #            #    #print("Baseline confidence: --> " + str(round(min_confidence, 2)) + "             Confidence: -->  " + str(round(1 - confidence_adjustment, 2)) + " in letter " + letter)
-    #            #    if pos!= None:
-    #            #        potentialLetters.append((letter, (1 - confidence_adjustment) + problem_adjustment, pos))
-                        
-
-                
-    #        if len(potentialLetters):
-    #            potentialLetters.sort(key = lambda x : x[1], reverse = True)
-    #            for letter in potentialLetters:
-    #                print("(" + letter[0] + ", " + str(round(letter[1], 2)) + ")", end = ", ")
-    #            print()
-    #            bestLetter = potentialLetters[0]
-
-    #            theLetter = (bestLetter[0])[0]
-    #            confidence = bestLetter[1]
-    #            pos = bestLetter[2]
-            
-    #            center_pos = pyautogui.center(pos)
-    #            new_pos_x, new_pos_y = center_pos
-
-    #            SCALER = 1.5
-    #            new_pos_x = new_pos_x * SCALER
-    #            new_pos_y = new_pos_y * SCALER
-
-    #            letter_x_grid, letter_y_grid = clickToGrid(new_pos_x, new_pos_y)
-    #            #print("Letter resides in position (" + str(letter_x_grid) + ", " + str(letter_y_grid) + ")")
-
-    #            ##if letter is on a locked tile, discard it
-    #            #if ((letter_x_grid, letter_y_grid)) in locked_tile_positions:
-    #            #    print("         That's a locked tile!")
-    #            #    return ((1.0 - confidence_adjustment, 0, 0)) #default return values
-
-    #            #else:
-    #            print("Confidence in letter " + theLetter + ": " + str(confidence))
-    #            letterCount = letterCount + 1
-
-    #            letterBoard[letter_y_grid][letter_x_grid][0] = theLetter
-    #            letterBoard[letter_y_grid][letter_x_grid][1] = confidence
-        
-    #            mouseSetAndClick(new_pos_x, new_pos_y)#because window resizing does weird things
-
-    #            printListLetterBoard(letterBoard)
-    #        else:
-    #            min_confidence = min_confidence - 0.05
-
-    #####################################################################################
-    #this class was used in an attempt to speed up the program, did not work :(
-    #class CustomThread(Thread):
-    #    def __init__(self, group = None, target = None, name = None, args = (), kwargs = {}, Verbose = None):
-    #        Thread.__init__(self, group, target, name, args, kwargs)
-    #        self._return = None
-
-    #    def run(self):
-    #        if self._target is not None:
-    #            self._return = self._target(*self._args, **self._kwargs)
-
-    #    def join(self):
-    #        Thread.join(self)
-    #        return self._return
-
-
-    #this process was used in an attempt to speed up the program, did not work :(
-    #def checkForLetterProcess(letter, min_confidence):
-
-
-    #    #(a, 0.9) ----> 1.00, 0.99, 0.98, ..., 0.9
-    #    #(b, 0.5) ----> 0.77, 0.76, 0.75, ..., 0.67 (adjustment is -0.17)
-        
-    #    pos = None
-    #    problem_adjustment =  getLetterAdjustment(letter)
-    #    #print(f"problem adjustment for '{letter}' is {problem_adjustment}")
-    #    #print(f"testing with min_confidence of {min_confidence}")
-
-    #    confidence_adjustment = 0.9 - (min_confidence - problem_adjustment)
-    #    #print(f"confidence adjustment starting at {round(confidence_adjustment, 2)}")
-    #    print()
-    #    letterName = letter + "Clear.png"
-
-    #    if confidence_adjustment + 0.1 < 0:
-    #        #print('nope')
-    #        return None
-
-    #    while(1 - confidence_adjustment + problem_adjustment > min_confidence and pos == None):#DOES NOT have to find a letter
-    #        pos = pyautogui.locateOnScreen(letterName, region = (300, 290, 250, 250), confidence = 1.0 - confidence_adjustment)
-    #        confidence_adjustment = confidence_adjustment + 0.01 #slowly decreases the confidence of the check
-
-    #        print(f"checking {letter} with confidence {round(1.0 - confidence_adjustment, 2)}...")
-    #        if pos!= None:
-    #            print(f"                Found letter {letter} with confidence {round(1.0 - confidence_adjustment, 2)}!")
-    #            return (letter, (1 - confidence_adjustment) + problem_adjustment, pos)
-    #    return None
-
-    #def printListLetterBoard(board):#first print letters, then print confidence levels in a separate grid
-    #    print(letterBoardString(board))
-
-    #def letterBoardString(board):
-    #    output = ""
-    #    for row in range(4):
-    #        output += "[ "
-    #        for col in range(4):
-    #            output += f" '{board[row][col][0]}' "
-    #        output += "]\n"
-    #    output += '\n'
-    #    for row in range(4):
-    #        output += "[ "
-    #        for col in range(4):
-    #            if board[row][col][1] == 0:
-    #                output += " --  "
-    #            else:
-    #                output += "{:.2f}".format(board[row][col][1]) + ' '
-    #        output += "]\n"
-
-    #    return output
-
-    #def verify_word(word, fancy_letter):
-    #    letter_count = 0
-    #    for letter in word:
-    #        if letter == fancy_letter.letter:
-    #            letter_count = letter_count + 1
-
-    #        if letter_count > fancy_letter.count:
-    #            return False
-        
-    #    return True
-
-    #def verify_words(words, fancyLetters):
-    #    any_removed = True
-    #    num_removed = 0
-
-    #    while (any_removed):
-    #        any_removed = False
-            
-    #        for word in words:
-    #            for fancy_letter in fancyLetters:
-    #                if not verify_word(word, fancy_letter) and word in words:
-    #                    words.remove(word)
-    #                    any_removed = True
-    #                    num_removed = num_removed + 1
-
-    #                    break
-    
-    #def readLetters(letterBoard, min_confidence, loopCount, letterCount, abnormal_count, locked_tile_positions):
-    #    gameType = inGame()
-    #    while not gameType:
-    #        time.sleep(1)
-    #        gameType = inGame()
-
-    #    while letterCount < 16 - abnormal_count - len(locked_tile_positions): #forces program to keep reading until board is full
-    #                            #confidence in guess drops on every pass, intended to account for gems distorting the image
-    #        for letter in ASCII_LOWERCASE + str((gameType - 1) * '?'):#sloppy but it works, doesn't check for ? in Bookworm 1
-    #            if letterCount >= 16 - abnormal_count - len(locked_tile_positions):
-    #                break
-    #            points, confidence_list = readLetter(letter, min_confidence, locked_tile_positions)#points holds all the places (pixel positions) where this letter is found 
-
-    #            pointIndex = 0
-    #            for point in points:
-    #                grid_x, grid_y = clickToGrid(point[0], point[1]) #fill board with predicted letters from read function
-                    
-    #                logging.info(f"Trying to add point [{grid_x}, {grid_y}]")
-                    
-    #                if not letterBoard[grid_y][grid_x][0] == '-': #stops the program from reading the same letter over and over if a window is stopping it from clicking or something like that
-    #                    logging.info("         Spot is taken!")
-    #                    break
-    #                else:
-    #                    letterBoard[grid_y][grid_x][0] = letter
-    #                    letterBoard[grid_y][grid_x][1] = round(confidence_list[pointIndex], 2)
-
-    #                    pointIndex = pointIndex + 1
-    #                    letterCount = letterCount + 1
-
-    #                    logging.info("            Counted letter " + str(letterCount))
-    #                    logging.info("\n" + letterBoardString(letterBoard))
-
-    #        min_confidence = min_confidence - 0.1 #gradually reduce confidence in guesses
-    #        loopCount = loopCount + 1
-
-    #    return (letterCount, loopCount)
-
-    #def readLetter(letter, confidence_adjustment, locked_tile_positions):
-    #    findingLetters = True
-    #    points_list = []#list of all the points where this letter exists
-    #    confidence_list = []
-
-    #    while findingLetters and len(points_list) <= 16:#len argument because otherwise it gets stuck searching for letters when confidence is super low
-    #        info = clickLetterMaybe(letter, confidence_adjustment, locked_tile_positions) #info holds (confidence, pixel_x, pixel_y) where [1] and [2] are locations of the letter
-    #        findingLetters = info[1] #if x val is 0 (default value), no letter has been found
-    #        if info[1] != 0:
-    #            confidence_list.append(info[0])
-    #            points_list.append((info[1], info[2]))
-
-    #    return ((points_list, confidence_list))#return the list of points and their respective confidence ratings
-    pass
