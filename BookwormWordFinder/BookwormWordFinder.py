@@ -139,8 +139,6 @@ class Tile:
    
 
 class LetterBoard:
-    
-
     def __init__(self, *args):
         self.board = [[Tile() for i in range(4)] for j in range(4)]
 
@@ -162,18 +160,6 @@ class LetterBoard:
                         else:
                             self.board[i][j] = Tile('-', 0)
 
-    def deep_copy(self):
-        new_board = LetterBoard()
-
-        for i in range(4):
-            for j in range(4):
-                new_letter = self.board[i][j].get_letter()
-                new_confidence = self.board[i][j].get_confidence()
-                new_board.board[i][j] = Tile(new_letter, new_confidence)
-
-        
-        return new_board
-
     def __str__(self):
         output = ""
         for row in range(4):
@@ -191,6 +177,14 @@ class LetterBoard:
                     output += "{:.2f}".format(self.board[row][col].get_confidence()) + ' '
             output += "]\n"
         return output
+
+    def get_letters(self):
+        letters = ""
+        for i in range(4):
+            for j in range(4):
+                if self.board[i][j].letter != '-':
+                    letters+= self.board[i][j].letter
+        return letters
 
 def load_dictionary():
     with open(WORD_SOURCE) as word_file:
@@ -252,37 +246,15 @@ def setup(autoInput, boardLetters):
 
             while len(temp_filtered_words) > 500:
                 del temp_filtered_words[-1]
-                num_removed = num_removed + 1
+                #num_removed += 1
 
             #need to append another letter for every time the program loops through the ? list
             #then remove/decrement that letter at the end
 
-
-           #######################################################################################
-
-            #for fancyLetter in fancyLetters:
-            #    if fancyLetter.letter == letter:
-            #        fancyLetter.count = fancyLetter.count + 1
-            #        break
-            #else:
-            #    fancyLetters.append(LetterAndCount(letter, 1))
-
-            #verify_words_new(temp_filtered_words, fancyLetters)
-
-            #for fancyLetter in fancyLetters:
-            #    if fancyLetter.letter == letter:
-            #        if fancyLetter.count == 1:
-            #            fancyLetters.remove(fancyLetter)
-            #        else:
-            #            fancyLetter.count = fancyLetter.count - 1
-            #        break
-            #######################################################################################
-
             #Make tempLetterBoard using the letters (except for ?), then append each individual letter on every pass
             tempLetterBoard = LetterBoard(tempBoardLetters + letter)
 
-            verify_words_new(temp_filtered_words, tempLetterBoard)
-
+            num_removed += verify_words_new(temp_filtered_words, tempLetterBoard)
 
             filtered_words = list(set(filtered_words) | set(temp_filtered_words))
             #print(f"list is now {len(filtered_words)} words long")
@@ -314,15 +286,16 @@ def verify_words_new(words, letterBoard):
                  num_removed = num_removed + 1
 
     logging.info(f"Removed {num_removed} items while analyzing words")
+    return num_removed
 
 def verify_word_new(word, letterBoard):
-    #essentially do the same process that the program does when actually spelling a word. If it fails, remove the word
+    #essentially do the same process that the program does when actually spelling a word (with the LetterBoard). If it fails, remove the word
     origWord = word #store the original word so the word confidence print statement stays intact
     if 'q' in word:
         word = fixQsInString(word)
 
     #don't want to change the inputted letterBoard, so create a copy
-    tempLetterBoard = letterBoard.deep_copy()
+    tempLetterBoard = copy.deepcopy(letterBoard)
 
     for letter in word:
         #find the letter that has the highest confidence rating, then click that one
@@ -342,16 +315,9 @@ def verify_word_new(word, letterBoard):
 
 def findLongestWord(autoInput, boardLetters):
     filtered_words, boardLetters = setup(autoInput, boardLetters)
-
-    #contains LetterAndCount objects, so letter:num pairs
-    #ex. string "aabbbc" would have be (a, 2), (b, 3), (c, 1)
-
-    #fancyLetters = getFancyLetters(boardLetters)    
-    #fancyLetters.sort()
-
     tempLetterBoard = LetterBoard(boardLetters)
 
-    #remove words from long list
+    #remove bad words from long list
     start = time.perf_counter()
     verify_words_new(filtered_words, tempLetterBoard)
     end = time.perf_counter()
@@ -384,42 +350,20 @@ def spellWord(word, letterBoard, inOrder):
     info = None
     list_of_clicks = []
 
-    
-
-    #if letter has a q in it, change the string to remove the u's right after q's
-    #ex. quest ---> qest             aquaqueick ---> aqaqeick
     origWord = word #store the original word so the word confidence print statement stays intact
     if 'q' in word:
         word = fixQsInString(word)
 
     if inOrder:
-        #TODO: DON'T THINK I NEED A TEMP LETTERBOARD ANYMORE, NEED TO VERIFY
-        #don't want to change the inputted letterBoard, so create a copy
-        #tempLetterBoard = [[list(('-', 0)), list(('-', 0)), list(('-', 0)), list(('-', 0))], 
-        #                   [list(('-', 0)), list(('-', 0)), list(('-', 0)), list(('-', 0))], 
-        #                   [list(('-', 0)), list(('-', 0)), list(('-', 0)), list(('-', 0))], 
-        #                   [list(('-', 0)), list(('-', 0)), list(('-', 0)), list(('-', 0))]]
-
-        #for row in range(4):
-        #    for col in range(4):
-        #        tempLetterBoard[col][row] = letterBoard[col][row]
-        
-
         tempLetterBoard = copy.deepcopy(letterBoard)
 
         for letter in word:
-            #find letter in tempLetterBoard
-            #use coords to click letter
-            #remove letter from tempLetterBoard
-
-            #print(letter)
+            #find letter in tempLetterBoard, use coords to click letter, remove letter from tempLetterBoard
 
             #find the letter that has the highest confidence rating, then click that one
             mostConfidentLetter = getMostConfidentLetterGrid(letter, tempLetterBoard)
 
             if mostConfidentLetter[0] == '-':
-                #list_of_clicks.sort()
-                #furthest_left_and_up = list_of_clicks[0]
                 logging.warning("         NOT ENOUGH LETTERS!")    
                 return (None, None)
 
@@ -430,13 +374,18 @@ def spellWord(word, letterBoard, inOrder):
             
     else:
         for letter in word:
-            info = clickLetterForce(letter)#info stores a tuple with (confidence rating, x position of click, y position of click)
+            if letter not in letterBoard.get_letters():
+                info = clickLetterForce('?')
+                print(f"letter {letter} not found, getting '?' instead")
+                letter = letter.upper()
+            else:
+                info = clickLetterForce(letter)#info stores a tuple with (confidence rating, x position of click, y position of click)
             average_confidence = average_confidence + info[0]
             list_of_clicks.append((info[1], info[2]))
 
             #modify letterBoard
             grid_x, grid_y = clickToGrid(info[1], info[2])
-            letterBoard.board[grid_y][grid_x] = list((letter, 1))
+            letterBoard.board[grid_y][grid_x] = Tile(letter, 1)
 
             count = count + 1
 
@@ -467,11 +416,11 @@ def clickLetterForce(letter):
         SCALER = 1.5
 
     if gameType == 2:
-        x_min = 650
-        y_min = 470
+        x_min = 770
+        y_min = 550
 
-        x_max = 1300
-        y_max = 1160
+        x_max = 1150
+        y_max = 950
 
         offset = 50
         append = "2Clear.png"
@@ -480,25 +429,24 @@ def clickLetterForce(letter):
 
     pos = None
     confidence_adjustment = 0
+
+    if letter == '?':
+       letter = "question"#have to make this change because you can't name a file '?2.png'
     
     letterName = letter + append
-    #TODO: REMOVE REPETITION HERE
+
     while(pos == None):#forces it to find a letter, may click wrong letter
-        logging.debug(f"Checking with confidence {1 - confidence_adjustment}")
+        logging.debug(f"checking {letter} with confidence {round(1.0 - confidence_adjustment, 2)}...")
         pos = pyautogui.locateOnScreen(letterName, region = (x_min - offset, y_min - offset, x_max - x_min + offset, y_max - y_min + offset), confidence = 1.0 - confidence_adjustment)
         confidence_adjustment = confidence_adjustment + 0.01 #slowly decreases the confidence of the check
+
     print("Confidence in letter " + letter + ": " + str(1.0 - confidence_adjustment))
     
-    center_pos = pyautogui.center(pos)
-    new_pos_x, new_pos_y = center_pos
+    grid_x, grid_y = posToGrid(pos)
+    new_pos_x, new_pos_y = gridToClick(grid_x, grid_y)
 
-    new_pos_x = new_pos_x * SCALER
-    new_pos_y = new_pos_y * SCALER
-
-    print("(" + str(new_pos_x) + ", " + str(new_pos_y) + ")")
-
-    point_x, point_y = clickToGrid(new_pos_x, new_pos_y)
-    print("      Conversion to grid points: (" + str(point_x) + ", " + str(point_y) + ")")
+    logging.debug("(" + str(new_pos_x) + ", " + str(new_pos_y) + ")")
+    logging.debug("      Conversion to grid points: (" + str(grid_x) + ", " + str(grid_y) + ")")
      
     mouseSetAndClick(new_pos_x, new_pos_y)
     return ((1.0 - confidence_adjustment, new_pos_x, new_pos_y))
@@ -567,23 +515,15 @@ def clickLetterMaybe(letter, min_confidence, locked_tile_positions): #will not c
         confidence_adjustment = confidence_adjustment + 0.01 #slowly decreases the confidence of the check
 
     if pos != None:
-       #TODO: REMOVE REPETITION AND CLEAN UP PRINT STATEMENTS 
-        center_pos = pyautogui.center(pos)
-        new_pos_x, new_pos_y = center_pos
-
-        new_pos_x = new_pos_x * SCALER
-        new_pos_y = new_pos_y * SCALER
-
-        letter_x_grid, letter_y_grid = clickToGrid(new_pos_x, new_pos_y)
-        #print("Letter resides in position (" + str(letter_x_grid) + ", " + str(letter_y_grid) + ")")
+        letter_x_grid, letter_y_grid = posToGrid(pos)
 
         #if letter is on a locked tile, discard it
         if ((letter_x_grid, letter_y_grid)) in locked_tile_positions:
-            #print("         That's a locked tile!")
+            logging.debug("         That's a locked tile!")
             return ((1.0 - confidence_adjustment, 0, 0)) #default return values
 
         else:
-            #print("Confidence in letter " + letter + ": " + str(1.0 - confidence_adjustment))
+            logging.debug("Confidence in letter " + letter + ": " + str(1.0 - confidence_adjustment))
     
             mouseSetAndClick(new_pos_x, new_pos_y)#because window resizing does weird things
             return ((1.0 - confidence_adjustment, new_pos_x, new_pos_y))
@@ -627,17 +567,16 @@ def attack(last_click_x, last_click_y):
 
     if gameType == 2:
         attackCoords = (950, 1100)
-        popupCoords = (450, 300)#dummy values, this game has no popup if the user mispells words
+        popupCoords = (450, 300)#dummy values, version 2 has no popup if the user mispells words
                                 #chose these values because they click on Lex, revealing an easter egg
 
-        find_last_click = lambda c : round(c - 30) #so the program checks the corner of the tile instead of the center
+        find_last_click = lambda c : round(c - 30) #-30 so the program checks the corner of the tile instead of the center
                                             #without this change, program would see the black of the letter instead of the tile color
     
     #clicks the attack button, doesn't always register for whatever reason...
     mouseSetAndClickCoords(attackCoords)
     mouseSetAndClickCoords(attackCoords)
     mouseSetAndClickCoords(attackCoords)
-
 
     
     #if cell is still empty after click, then the attack didn't work (word was misspelled), so return false
@@ -654,7 +593,6 @@ def attack(last_click_x, last_click_y):
     
     #empty cell is 15, 12, 0 rgb roughly
     #if cell is still empty after attack, then attack failed (board wasn't refilled with new letters)
-    #TODO: SOMETIMES BREAKS BECAUSE GEMS SPILL INTO THE AREA WHICH IT CHECKS
     if pyautogui.pixelMatchesColor(adjusted_last_click_x, adjusted_last_click_y, (15, 12, 0), tolerance = 35):
         return False
     else:
@@ -773,6 +711,10 @@ def readLettersImproved(letterBoard, min_confidence, loopCount, letterCount, abn
 
     while letterCount < 16 - abnormal_count - len(locked_tile_positions): #forces program to keep reading until board is full
                             #confidence in guess drops on every pass, intended to account for gems distorting the image
+
+        #move mouse out of the way of the image recognition
+        win32api.SetCursorPos((30, 30)) 
+
         potentialLetters = []
         for letter in ASCII_LOWERCASE + str((gameType - 1) * '?'):#sloppy but it works, doesn't check for ? in Bookworm 1 
             infos = readLetterImproved(letter, min_confidence, locked_tile_positions)
@@ -815,9 +757,6 @@ def readLettersImproved(letterBoard, min_confidence, loopCount, letterCount, abn
                 logging.info("            Counted letter " + str(letterCount))
                 logging.info("\n" + letterBoard.__str__())
                 clickLetterWithCoords(grid_x, grid_y)
-
-
-           
 
     return (letterCount, loopCount)
         
@@ -885,7 +824,6 @@ def readLetterImproved(letter, min_confidence, locked_tile_positions):
     if pos_list:
         final_pos_list = []
         for pos in pos_list:
-            #TODO: REDUCE REPETITION HERE, CLEAN UP PRINT STATEMENTS
             letter_x_grid, letter_y_grid = pos
             logging.debug(f"Letter {orig_letter} may reside in position ({letter_x_grid}, {letter_y_grid})")
 
@@ -902,14 +840,11 @@ def readLetterImproved(letter, min_confidence, locked_tile_positions):
     else:#did not find letter
         return None
 
-def checkForLocked():#TODO: PROGRAM SOMETIMES SEES THE BLACK PIXELS IN THE LETTERS AND GETS CONFUSED (sees that letter is black and background tile is black ----> thinks tile is locked)
+def checkForLocked():
     #loop through all grid tiles
     #then, if the color of the click spot is the same before and after the click, tile didn't move so it must be locked
 
-    color2DArray = [[list((0, 0, 0)), list((0, 0, 0)), list((0, 0, 0)), list((0, 0, 0))], 
-                    [list((0, 0, 0)), list((0, 0, 0)), list((0, 0, 0)), list((0, 0, 0))], 
-                    [list((0, 0, 0)), list((0, 0, 0)), list((0, 0, 0)), list((0, 0, 0))], 
-                    [list((0, 0, 0)), list((0, 0, 0)), list((0, 0, 0)), list((0, 0, 0))]]
+    color2DArray = [[list((0, 0, 0)) for i in range (4)] for j in range(4)]
 
     locked_count = 0
     locked_points = []
@@ -971,15 +906,16 @@ def checkForLocked():#TODO: PROGRAM SOMETIMES SEES THE BLACK PIXELS IN THE LETTE
     for x in range(x_min, x_max, step):
         row = 0
         for y in range(y_min, y_max, step):
-            color = color2DArray[col][row]
-            #color = (0, 0, 0)
+            #color = color2DArray[col][row] #remove the not in the color check below if choosing this color option
+            color = (0, 0, 0)
 
-            if pyautogui.pixelMatchesColor(x, y, (color), tolerance = 35):
-                wrong_color = pyautogui.pixel(x, y)
+            other_color = pyautogui.pixel(x, y)
+            print(f"  expected {color} and saw {other_color} in position (" + str(col) + ", " + str(row) + ")")
+
+            if not pyautogui.pixelMatchesColor(x, y, (color), tolerance = 35):
                 locked_count = locked_count + 1
                 locked_points.append((col, row))
                 print(f"Found locked tile in position (" + str(col) + ", " + str(row) + ")")
-                print(f"      expected {color} and saw {wrong_color}")
             row = row + 1
         col = col + 1
 
@@ -1088,7 +1024,7 @@ def getMostConfidentLetterGrid(letter, letterBoard):#return the grid location of
                 #find the letter that has the highest confidence rating, then click that one
                 lettersToClick.append((letterBoard.board[col][row], row, col))
             elif letterBoard.board[col][row].get_letter() == '?':
-                lettersToClick.append((Tile(letter, 0.01), row, col))
+                lettersToClick.append((Tile(letter.upper(), 0.01), row, col))
 
     lettersToClick.sort(key = lambda x : x[0], reverse = True)
 
@@ -1159,10 +1095,6 @@ def main():
     locked_tile_positions = []
     abnormal_count = -1
 
-    #letterBoard = [[list(('-', 0)), list(('-', 0)), list(('-', 0)), list(('-', 0))], 
-    #               [list(('-', 0)), list(('-', 0)), list(('-', 0)), list(('-', 0))], 
-    #               [list(('-', 0)), list(('-', 0)), list(('-', 0)), list(('-', 0))], 
-    #               [list(('-', 0)), list(('-', 0)), list(('-', 0)), list(('-', 0))]]
     letterBoard = LetterBoard()
     boardLetters = ""
 
@@ -1183,10 +1115,9 @@ def main():
 
         if int(decision) == 0:
             inOrder = False
-
-        if inOrder:
-            #fill letterboard completely
-           letterBoard = LetterBoard(boardLetters)
+        
+        #fill letterboard completely
+        letterBoard = LetterBoard(boardLetters) #inOrder version also uses this board, but as a dummy version so it can read boardLetters
 
         print(letterBoard)
  
@@ -1219,6 +1150,8 @@ def main():
         print(f"Took {end - start} seconds to find the longest word")
 
     print()
+    
+    #Print words and attack----------------------------------------------------------------------------
 
     #print the longest words (or all the words if the list is not that many words long)
     if len(filtered_words) >= PRINTED_WORDS:
@@ -1243,9 +1176,6 @@ def main():
     numberOfAttempts = 0
     while not success:
         clearBoard()
-
-        if not inOrder:#TODO: CHECK IF THIS IS NECESSARY
-            letterBoard = [['-', '-', '-', '-'], ['-', '-', '-', '-'], ['-', '-', '-', '-'], ['-', '-', '-', '-']]
 
 
         #attack, hope it works
