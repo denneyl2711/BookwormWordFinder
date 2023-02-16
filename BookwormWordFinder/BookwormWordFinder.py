@@ -69,7 +69,7 @@ import pytesseract
 import cv2
 from PIL import ImageGrab
 
-logging.basicConfig(level = logging.INFO)
+logging.basicConfig(level = logging.DEBUG)
 #INFO prints out board states as the program reads the board, 
     #also the number of words removed while searching for longest word
     #also miscellaneous info which is only printed a few times
@@ -101,7 +101,7 @@ class LetterAndCount:
         return self.letter < other.letter
 
     def __str__(self):
-        return f"Letter: {self.letter}\nCount: {self.count}\n"
+        return f"({self.letter}, {self.count})"
 
 class Tile:
     confidence = 0
@@ -140,6 +140,9 @@ class Tile:
 
     def __str__(self):
         return f"Letter is {self.letter}, confidence is {self.confidence}."
+    
+    def __repr__(self):
+        return f"({self.letter}, {self.confidence})"
 
    
 
@@ -189,6 +192,7 @@ class LetterBoard:
             for j in range(4):
                 if self.board[i][j].letter != '-':
                     letters+= self.board[i][j].letter
+
         return letters
 
 def load_dictionary():
@@ -226,18 +230,21 @@ def setup(autoInput, boardLetters):
                 tempBoardLetters = tempBoardLetters + letter
 
     start = time.perf_counter()
-
+    num_removed = 0
     if not wildTile:
         pattern = r'^[' + tempBoardLetters + ']+$'
         regex = re.compile(pattern)
 
+        pre_size = len(english_words)
         filtered_words = list(filter(regex.search, english_words))
+        post_size = len(filtered_words)
+        num_removed += pre_size - post_size
     else:
         filtered_words = list()
         #run the same test 26 times with the ? being replaced with a new letter every time
         #note: if the letter is q, need to insert both a q and a u                            
         
-        num_removed = 0
+       
         for letter in ASCII_LOWERCASE:
             if letter != 'q':
                 pattern = r'^[' + tempBoardLetters + letter + ']+$'
@@ -245,7 +252,11 @@ def setup(autoInput, boardLetters):
                 pattern = r'^[' + tempBoardLetters + letter + 'u' + ']+$'
 
             regex = re.compile(pattern)
+
+            pre_size = len(english_words)
             temp_filtered_words = list(filter(regex.search, english_words))
+            post_size = len(temp_filtered_words)
+            num_removed += pre_size - post_size
 
             temp_filtered_words.sort(key =len, reverse = True) #sort by length, longer words first
 
@@ -264,8 +275,8 @@ def setup(autoInput, boardLetters):
             filtered_words = list(set(filtered_words) | set(temp_filtered_words))
             #print(f"list is now {len(filtered_words)} words long")
 
-        end = time.perf_counter()
-        print(f"Took {end-start} seconds to run regex (and other take other measures), removing {num_removed} words")
+    end = time.perf_counter()
+    print(f"Took {end-start} seconds to run regex, removing {num_removed} words")
         
 
     filtered_words.sort(key =len, reverse = True) #sort by length, longer words first
@@ -281,6 +292,7 @@ def verify_words_new(words, letterBoard):
     any_removed = True
     num_removed = 0
 
+    start = time.perf_counter() 
     while any_removed:
         any_removed = False
 
@@ -289,8 +301,9 @@ def verify_words_new(words, letterBoard):
                  words.remove(word)
                  any_removed = True
                  num_removed = num_removed + 1
+    end = time.perf_counter()
 
-    logging.info(f"Removed {num_removed} items while analyzing words")
+    logging.info(f"Took {end-start} seconds to analyze remaining items, removing {num_removed} words")
     return num_removed
 
 def verify_word_new(word, letterBoard):
@@ -318,7 +331,7 @@ def verify_word_new(word, letterBoard):
        
     return True
 
-def findLongestWord(autoInput, boardLetters):
+def findLongestWords(autoInput, boardLetters):
     filtered_words, boardLetters = setup(autoInput, boardLetters)
     tempLetterBoard = LetterBoard(boardLetters)
 
@@ -380,6 +393,8 @@ def spellWord(word, letterBoard, inOrder):
     else:
         for letter in word:
             if letter not in letterBoard.get_letters():
+                #TODO: PROGRAM BREAKS HERE FOR SOME MANUAL & UNORDERED INPUT
+                    #I believe this is a qu issue
                 info = clickLetterForce('?')
                 print(f"letter {letter} not found, getting '?' instead")
                 letter = letter.upper()
@@ -411,10 +426,10 @@ def clickLetterForce(letter):
 
     x_min, y_min, x_max, y_max, offset, step, SCALER = getBoundaries(gameType)
     if gameType == 1:
-        append = "Clear.png"
+        append = ".png"
 
     if gameType == 2:
-        append = "2Clear.png"
+        append = "2.png"
 
     boundaries = (x_min - offset, y_min - offset, x_max - x_min + offset, y_max - y_min + offset)
 
@@ -457,10 +472,10 @@ def clickLetterMaybe(letter, min_confidence, locked_tile_positions): #will not c
     x_min, y_min, x_max, y_max, offset, step, SCALER = getBoundaries(gameType)
 
     if gameType == 1:
-        append = "Clear.png"#this is appened to the letter so the program can search for the file name
+        append = ".png"#this is appened to the letter so the program can search for the file name
 
     if gameType == 2:
-        append = "2Clear.png"#this is appened to the letter so the program can search for the file name
+        append = ".png"#this is appened to the letter so the program can search for the file name
 
     boundaries = (x_min - offset, y_min - offset, x_max - x_min + offset, y_max - y_min + offset)
 
@@ -629,20 +644,19 @@ def readGrid(letterBoard):#remove abnormal tiles, read the normal ones, then rea
                             #abnormal tiles are removed because the gem tiles have an animation which bleeds into other tiles
                             #this bleeding effect intereferes with the image recognition for the other tiles
                             #(abnormal tiles are simply found using color values)
-    letterCount = 0
-    min_confidence = 0.90
-    loopCount = 0
-
     #locate locked tiles
     locked_tile_positions = checkForLocked()
-    print("Found " + str(len(locked_tile_positions)) + " locked tiles from checkForLocked()")
+    print(f"Found {len(locked_tile_positions)} locked tiles from checkForLocked()")
 
     #locate abnormal tiles (gems, smashed tiles, etc) not including locked tiles
     #click these tiles
     clearBoard()
-    abnormal_count = clickAbnormalTiles()
 
-    letterCount, loopCount = readLettersImproved(letterBoard, min_confidence, loopCount, letterCount, abnormal_count, locked_tile_positions)
+    abnormal_count = clickAbnormalTiles()
+    letterCount = 0
+    min_confidence = 0.85
+
+    letterCount = readLettersImproved(letterBoard, min_confidence, letterCount, abnormal_count, locked_tile_positions)
 
     clearBoard()
     #remove the normal tiles before reading the gems
@@ -657,24 +671,19 @@ def readGrid(letterBoard):#remove abnormal tiles, read the normal ones, then rea
     print(letterBoard)
     print()
 
-    min_confidence = 0.9
+   
 
-    #click on the locked tile positions just in case one was incorrectly read
-    #this helps prevent the program from getting stuck on tiles it cannot read
-    for pos in locked_tile_positions:
-        x, y = pos
-        clickLetterWithCoords(x, y)
-    
-    loopCount = readLettersImproved(letterBoard, min_confidence, loopCount, letterCount, 0, locked_tile_positions)[1]
+   
 
-    logging.info(f"Took {loopCount} loops to fill the board")
+    min_confidence = 0.75
+    readLettersImproved(letterBoard, min_confidence, letterCount, 0, locked_tile_positions)
 
     print(letterBoard)
 
     return locked_tile_positions, abnormal_count
 
 
-def readLettersImproved(letterBoard, min_confidence, loopCount, letterCount, abnormal_count, locked_tile_positions):#try to read letters at confidence .95, then 80,... etc.
+def readLettersImproved(letterBoard, min_confidence, letterCount, abnormal_count, locked_tile_positions):#try to read letters at confidence .95, then 80,... etc.
                                         #if match, then decrease in confidence until no more match within that letter
                                         #should decrease the number of unneeded checks
     gameType = inGame()
@@ -682,58 +691,65 @@ def readLettersImproved(letterBoard, min_confidence, loopCount, letterCount, abn
         time.sleep(1)
         gameType = inGame()
 
-    min_confidence = 0.9
 
     while letterCount < 16 - abnormal_count - len(locked_tile_positions): #forces program to keep reading until board is full
-                            #confidence in guess drops on every pass, intended to account for gems distorting the image
+                            #confidence in guess drops on every pass
+       
+        potentialTiles = []
+                  
+        items = [(letter, min_confidence, locked_tile_positions) for letter in ASCII_LOWERCASE + str((gameType - 1) * '?')]
 
+        clickLockedTiles(locked_tile_positions)#click on locked tiles just in case some tiles were incorrectly labeled locked
         #move mouse out of the way of the image recognition
         win32api.SetCursorPos((30, 30)) 
 
-        potentialLetters = []
-        for letter in ASCII_LOWERCASE + str((gameType - 1) * '?'):#sloppy but it works, doesn't check for ? in Bookworm 1 
-            infos = readLetterImproved(letter, min_confidence, locked_tile_positions)
-            if infos:
-                for info in infos:
-                    potentialLetters.append(info)
+        with Pool() as pool:
+           for result in pool.starmap(readLetterImproved, items):
+               if result!= None:
+                   for tile in result:
+                        potentialTiles.append(tile)
 
         #sort by confidence level and select the most confident
-        potentialLetters.sort(key = lambda x : x[1], reverse = True)
-        for letter in potentialLetters:
-            logging.info(letter)
+        potentialTiles.sort(reverse = True)
+        for tile in potentialTiles:
+            logging.info(tile)
 
-        if not potentialLetters:
+        #if not potentialTiles:
+        if len(potentialTiles) <= 2:
             logging.debug("                                             reducing confidence")
             min_confidence -= 0.1
         else:
             logging.debug("                                             not reducing confidence")
 
-        while potentialLetters:
-            firstLetter = potentialLetters[0]
-            letter = firstLetter[0][0]
-            letter_confidence = firstLetter[1]
-            grid_x, grid_y = firstLetter[2], firstLetter[3]
+        while potentialTiles:
+            first_tile = potentialTiles[0]
+            tile = first_tile[0]
 
-            for potentialLetter in potentialLetters:#remove letters which are on the same tile
-               if potentialLetter[2] == grid_x and potentialLetter[3] == grid_y:
-                   potentialLetters.remove(potentialLetter)
+            tile_letter = tile.get_letter()
+            tile_confidence = tile.get_confidence()
+            grid_x, grid_y = first_tile[1], first_tile[2]
 
-            logging.info(f"Trying to add letter '{letter}' in position [{grid_x}, {grid_y}]")
+           
+
+            logging.info(f"Trying to add letter '{tile_letter}' in position [{grid_x}, {grid_y}]")
                 
             if not letterBoard.board[grid_y][grid_x].get_letter() == '-': #stops the program from reading the same letter over and over if a window is stopping it from clicking or something like that
                 logging.warning("         Spot is taken!")
+                potentialTiles.remove(first_tile)
                 continue
             else:
-                letterBoard.board[grid_y][grid_x].set_letter(letter)
-                letterBoard.board[grid_y][grid_x].set_confidence(round(letter_confidence, 2))
-
+                letterBoard.board[grid_y][grid_x] = Tile(tile_letter, tile_confidence)
                 letterCount = letterCount + 1
 
                 logging.info("            Counted letter " + str(letterCount))
                 logging.info("\n" + letterBoard.__str__())
                 clickLetterWithCoords(grid_x, grid_y)
 
-    return (letterCount, loopCount)
+                for potentialTile in potentialTiles:#remove letters which are on the same tile
+                    if potentialTile[1] == grid_x and potentialTile[2] == grid_y:
+                        potentialTiles.remove(potentialTile)
+
+    return letterCount
         
 
 def readLetterImproved(letter, min_confidence, locked_tile_positions):
@@ -747,12 +763,13 @@ def readLetterImproved(letter, min_confidence, locked_tile_positions):
     boundaries = (x_min - offset, y_min - offset, x_max - x_min + offset, y_max - y_min + offset)
 
     if gameType == 1:
-        append = "Clear.png"#this is appened to the letter so the program can search for the file name
+        append = ".png"#this is appened to the letter so the program can search for the file name
 
     if gameType == 2:
         append = "2.png"#this is appended to the letter so the program can search for the file name
 
-    problem_adjustment = getLetterAdjustment(letter)
+    #problem_adjustment = getLetterAdjustment(letter)
+    problem_adjustment = 0
     confidence_adjustment = 0.9 - (min_confidence - problem_adjustment)
 
     if confidence_adjustment < 0:
@@ -777,10 +794,16 @@ def readLetterImproved(letter, min_confidence, locked_tile_positions):
                 position_x_grid, position_y_grid = position
 
                 if pos_x_grid == position_x_grid and pos_y_grid == position_y_grid:
-                   logging.debug("Removed duplicate in readLetterImproved()!")
+                   logging.debug(f"Removed duplicate in readLetterImproved() ['{letter}', {pos_x_grid}, {pos_y_grid}]!")
                    break
             else:
-                pos_list.append((pos_x_grid, pos_y_grid))
+                if not ((pos_x_grid, pos_y_grid)) in locked_tile_positions:
+                    pos_list.append((pos_x_grid, pos_y_grid))
+                    logging.debug(f"     Appended ['{letter}', {pos_x_grid}, {pos_y_grid}]!")
+
+                else: #if letter is on a locked tile, discard it
+                    logging.info("         That's a locked tile!")
+                    break
         confidence_adjustment = confidence_adjustment - 0.01 #slowly decreases the confidence of the check
 
     if pos_list:
@@ -788,16 +811,11 @@ def readLetterImproved(letter, min_confidence, locked_tile_positions):
         for pos in pos_list:
             letter_x_grid, letter_y_grid = pos
             logging.debug(f"Letter {orig_letter} may reside in position ({letter_x_grid}, {letter_y_grid})")
-
-            if not ((letter_x_grid, letter_y_grid)) in locked_tile_positions:
-                logging.debug("Confidence in letter " + letter + ": " + str(0.99 - confidence_adjustment))
-                final_pos_list.append((orig_letter, 0.99 - confidence_adjustment + problem_adjustment, letter_x_grid, letter_y_grid))
-            
-
-            else: #if letter is on a locked tile, discard it
-                logging.info("         That's a locked tile!")
+            logging.debug("Confidence in letter " + letter + ": " + str(0.99 - confidence_adjustment))
+            tile_adding = Tile(orig_letter, 0.99 - confidence_adjustment + problem_adjustment)
+            final_pos_list.append((tile_adding, letter_x_grid, letter_y_grid))
                 
-        return (final_pos_list)
+        return final_pos_list
 
     else:#did not find letter
         return None
@@ -817,11 +835,7 @@ def checkForLocked():
         gameType = inGame()
 
     x_min, y_min, x_max, y_max, offset, step, SCALER = getBoundaries(gameType)
-    #checkForLocked() boundaries are different because getBoundaries() gives boundaries slightly outside of the board
-    x_min += 30
-    y_min += 20
-    x_max -= 50
-    y_max -= 90
+   
 
     if gameType == 1:
         find_x = lambda x : round((x * 1.5))
@@ -830,6 +844,11 @@ def checkForLocked():
     if gameType == 2:
         find_x = lambda x : x - 12
         find_y = lambda y : y - 5
+         #checkForLocked() boundaries are different because getBoundaries() gives boundaries slightly outside of the board
+        x_min += 30
+        y_min += 20
+        x_max -= 50
+        y_max -= 90
 
     col = 0#scan from top to bottom instead of left to right
     for y in range(y_min, y_max, step):
@@ -883,11 +902,7 @@ def clickAbnormalTiles():#clicks on the tiles which are gems, plagued, smashed, 
 
     x_min, y_min, x_max, y_max, offset, step, SCALER = getBoundaries(gameType)
 
-    #abnormalTiles() boundaries are different because getBoundaries() gives boundaries slightly outside of the board
-    x_min += 30
-    y_min += 20
-    x_max -= 50
-    y_max -= 90
+    
 
     if gameType == 1:
         find_x = lambda x : round((x * 1.5))
@@ -896,6 +911,11 @@ def clickAbnormalTiles():#clicks on the tiles which are gems, plagued, smashed, 
     if gameType == 2:
         find_x = lambda x : x
         find_y = lambda y : y 
+        #abnormalTiles() boundaries are different because getBoundaries() gives boundaries slightly outside of the board
+        x_min += 30
+        y_min += 20
+        x_max -= 50
+        y_max -= 90
 
     for x in range(x_min, x_max, step):
         for y in range(y_min, y_max, step):
@@ -915,31 +935,45 @@ def clickAbnormalTiles():#clicks on the tiles which are gems, plagued, smashed, 
     return abnormal_count
 
 def getLetterAdjustment(letter):
+
+
+
+    #TODO: FOR TESTING ONLY
+    return 0
+
     gameType = inGame()
     while not gameType:
         time.sleep(1)
         gameType = inGame()
 
     if gameType == 1:
-        tooMany = ['c', 'e', 'l', 'p', 'r', 't', 'u']#letters are (incorrectly) recognized too often without this adjustment
-        bitTooMany = ['a', 'b', 'd', 'f', 'h', 'j', 'k', 'm', 'n', 'q', 's','x', 'y', 'z']#slight adjustment
+        #tooMany = ['c', 'e', 'l', 'p', 'r', 't', 'u']#letters are (incorrectly) recognized too often without this adjustment
+        #bitTooMany = ['a', 'b', 'd', 'f', 'h', 'j', 'k', 'm', 'n', 'q', 's','x', 'y', 'z']#slight adjustment
 
-        bitNotEnough = ['i','o']
-        notEnough = ['k', 'p', 'w']#letters aren't recognized enough if this adjustment isn't made
+        #bitNotEnough = ['i','o']
+        #notEnough = ['k', 'p', 'w']#letters aren't recognized enough if this adjustment isn't made
 
-        if letter in bitTooMany:
-            return -0.17
+        #if letter in bitTooMany:
+        #    return -0.17
+        #elif letter in tooMany:
+        #    return -0.20
+
+
+        #elif letter in bitNotEnough:
+        #    return 0.03
+        #elif letter in notEnough:
+        #    return 0.08
+
+        #elif letter == 'g':
+        #    return -0.21
+
+        notEnough = ['i', 'o']
+        tooMany = ['g']
+
+        if letter in notEnough:
+            return 0.18
         elif letter in tooMany:
-            return -0.20
-
-
-        elif letter in bitNotEnough:
-            return 0.03
-        elif letter in notEnough:
-            return 0.08
-
-        elif letter == 'g':
-            return -0.21
+            return -0.1
 
     if gameType == 2:#looks like adjustment is only needed for Bookworm Adventures 1
         #tooMany = []
@@ -984,6 +1018,12 @@ def getMostConfidentLetterGrid(letter, letterBoard):#return the grid location of
 
     return (bestLetter)
 
+def clickLockedTiles(locked_tile_positions):
+     #click on the locked tile positions just in case one was incorrectly read
+    #this helps prevent the program from getting stuck on tiles it cannot read
+    for pos in locked_tile_positions:
+        x, y = pos
+        clickLetterWithCoords(x, y)
 
 def getFancyLetters(word):
     #load fancyLetters into []
@@ -1078,8 +1118,8 @@ def main():
         manual = False
 
     if manual:
-        filtered_words, boardLetters = findLongestWord(None, boardLetters)
-
+        filtered_words, boardLetters = findLongestWords(None, boardLetters)
+       
         decision = input("Are the letters of the input in order? (0 for no, 1 for yes) --> ")
 
         if int(decision) == 0:
@@ -1113,7 +1153,7 @@ def main():
                     autoInput = autoInput + letterBoard.board[i][j].get_letter()
 
         start = time.perf_counter()
-        filtered_words = findLongestWord(autoInput, boardLetters)[0]
+        filtered_words = findLongestWords(autoInput, boardLetters)[0]
         end = time.perf_counter()
 
         print(f"Took {end - start} seconds to find the longest word")
