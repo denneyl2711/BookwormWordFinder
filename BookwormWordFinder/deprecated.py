@@ -456,3 +456,56 @@
 
 #    return ((points_list, confidence_list))#return the list of points and their respective confidence ratings
 
+#def getLetterAdjustment(letter):
+
+
+
+#    #TODO: FOR TESTING ONLY
+#    return 0
+
+#    gameType = inGame()
+#    while not gameType:
+#        time.sleep(1)
+#        gameType = inGame()
+
+#    if gameType == 1:
+#        #tooMany = ['c', 'e', 'l', 'p', 'r', 't', 'u']#letters are (incorrectly) recognized too often without this adjustment
+#        #bitTooMany = ['a', 'b', 'd', 'f', 'h', 'j', 'k', 'm', 'n', 'q', 's','x', 'y', 'z']#slight adjustment
+
+#        #bitNotEnough = ['i','o']
+#        #notEnough = ['k', 'p', 'w']#letters aren't recognized enough if this adjustment isn't made
+
+#        #if letter in bitTooMany:
+#        #    return -0.17
+#        #elif letter in tooMany:
+#        #    return -0.20
+
+
+#        #elif letter in bitNotEnough:
+#        #    return 0.03
+#        #elif letter in notEnough:
+#        #    return 0.08
+
+#        #elif letter == 'g':
+#        #    return -0.21
+
+#        notEnough = ['i', 'o']
+#        tooMany = ['g']
+
+#        if letter in notEnough:
+#            return 0.18
+#        elif letter in tooMany:
+#            return -0.1
+
+#    if gameType == 2:#looks like adjustment is only needed for Bookworm Adventures 1
+#        #tooMany = []
+#        #bitTooMany = []
+
+#        #notEnough = ['i']
+
+#        #if letter == 'i':
+#        #    return 0.65
+
+#        pass
+
+#    return 0
