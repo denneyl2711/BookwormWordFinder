@@ -10,16 +10,12 @@
     #For more details, visit readLettersImproved() and readLetterImproved()
 
 #What have you done to make the letter-reading process more reliable?
-    #1. Variable letter confidences
-        #Particularly in Bookworm Adventures version 1, some letters are recognized more often than they should be.
-        #To counteract this, these letters are manually given a lower priority/confidence when they are searched for.
-        #For more details, see getLetterAdjustment() and clicking functions such as clickLetterMaybe() 
-    #2. Searching for "abnormal tiles"
+    #1. Searching for "abnormal tiles"
         #Gems, smashed tiles, burning tiles, and other abnormal tiles interfere with the image recognition process, especially when they animate.
             #ex. Gems have a pulsing animation which bleeds into other tiles
         #To counteract this, abnormal tiles are clicked by the program so the 'normal' tiles can be read in isolation.
         #For more details, see clickAbnormalTiles() and readGrid()
-    #3. List of potential letters
+    #2. List of potential letters
         #When reading letters, the program creates a list of letters it may click.
         #It stores the letter, its confidence in that letter, and its position on the board
             #ex. ('a', 0.84, 1, 2), ('y', 0.73, 3, 3), ('b', 0.72, 3, 1), ('o', 0.70, 1, 2)
@@ -73,8 +69,9 @@ logging.basicConfig(level = logging.DEBUG)
 #INFO prints out board states as the program reads the board, 
     #also the number of words removed while searching for longest word
     #also miscellaneous info which is only printed a few times
+
 #DEBUG prints out individual letter confidences as it tries to read them
-    #also info for the 2d color array in checkForLocked(info for the 2d color array in checkForLocked()
+    #also info for the 2d color array in checkForLocked(info for the 2d color array in checkForLocked())
 
 WORD_LENGTH_MAX = 16
 WORD_LENGTH_MIN = 3
@@ -270,8 +267,6 @@ def setup(autoInput, boardLetters):
             #Make tempLetterBoard using the letters (except for ?), then append each individual letter on every pass
             tempLetterBoard = LetterBoard(tempBoardLetters + letter)
 
-            num_removed += verify_words_new(temp_filtered_words, tempLetterBoard)
-
             filtered_words = list(set(filtered_words) | set(temp_filtered_words))
             #print(f"list is now {len(filtered_words)} words long")
 
@@ -312,22 +307,19 @@ def verify_word_new(word, letterBoard):
     if 'q' in word:
         word = fixQsInString(word)
 
-    #don't want to change the inputted letterBoard, so create a copy
-    tempLetterBoard = copy.deepcopy(letterBoard)
+    letters = [*letterBoard.get_letters()]
 
-    for letter in word:
-        #find the letter that has the highest confidence rating, then click that one
-        mostConfidentLetter = getMostConfidentLetterGrid(letter, tempLetterBoard)
-
+         
+    for letter in word: #Try to find letter, or '?' if that letter not found
         try:
-            letter, grid_x, grid_y = mostConfidentLetter
-
+            letters.remove(letter)
         except:
-            #logging.debug(f"Removed the word {word} while analyzing words")    
-            return False
-
-        tempLetterBoard.board[grid_y][grid_x] = Tile()
-
+            try:
+                letters.remove('?')
+            except:
+                return False
+        
+        
        
     return True
 
@@ -479,15 +471,12 @@ def clickLetterMaybe(letter, min_confidence, locked_tile_positions): #will not c
 
     boundaries = (x_min - offset, y_min - offset, x_max - x_min + offset, y_max - y_min + offset)
 
-    #problem_adjustment is a skewing done because some letters are recognized more often / less often than they should be
-    #program very commonly confuses i's for t's, etc without this adjustment
-    problem_adjustment = getLetterAdjustment(letter)
-    
+        
     if letter == '?':
         letter = "question"#have to make this change because you can't name a file '?2.png'
 
     letterName = letter + append
-    confidence_adjustment = 0.9 - (min_confidence - problem_adjustment)
+    confidence_adjustment = 0.9 - min_confidence
 
     if confidence_adjustment < 0:
         confidence_adjustment = 0
@@ -495,7 +484,7 @@ def clickLetterMaybe(letter, min_confidence, locked_tile_positions): #will not c
     #right side of this inequality determines how far the program goes before giving up
     #the higher the right side is, the further it allows its guesses to stray from the confidence
     pos = None
-    while(1 - confidence_adjustment + problem_adjustment > min_confidence and pos == None):#DOES NOT have to click a letter
+    while(1 - confidence_adjustment > min_confidence and pos == None):#DOES NOT have to click a letter
         logging.debug(f"checking {letter} with confidence {round(1.0 - confidence_adjustment, 2)}...")
         pos = pyautogui.locateOnScreen(letterName, region = boundaries, confidence = 1.0 - confidence_adjustment)
 
@@ -672,10 +661,7 @@ def readGrid(letterBoard):#remove abnormal tiles, read the normal ones, then rea
     print()
 
    
-
-   
-
-    min_confidence = 0.75
+    min_confidence = 0.75 #start at a lower confidence because abnormal tiles won't be recognized at higher confidences anyway
     readLettersImproved(letterBoard, min_confidence, letterCount, 0, locked_tile_positions)
 
     print(letterBoard)
@@ -729,8 +715,6 @@ def readLettersImproved(letterBoard, min_confidence, letterCount, abnormal_count
             tile_confidence = tile.get_confidence()
             grid_x, grid_y = first_tile[1], first_tile[2]
 
-           
-
             logging.info(f"Trying to add letter '{tile_letter}' in position [{grid_x}, {grid_y}]")
                 
             if not letterBoard.board[grid_y][grid_x].get_letter() == '-': #stops the program from reading the same letter over and over if a window is stopping it from clicking or something like that
@@ -751,7 +735,6 @@ def readLettersImproved(letterBoard, min_confidence, letterCount, abnormal_count
 
     return letterCount
         
-
 def readLetterImproved(letter, min_confidence, locked_tile_positions):
     
     gameType = inGame()
@@ -768,9 +751,7 @@ def readLetterImproved(letter, min_confidence, locked_tile_positions):
     if gameType == 2:
         append = "2.png"#this is appended to the letter so the program can search for the file name
 
-    #problem_adjustment = getLetterAdjustment(letter)
-    problem_adjustment = 0
-    confidence_adjustment = 0.9 - (min_confidence - problem_adjustment)
+    confidence_adjustment = 0.9 - min_confidence
 
     if confidence_adjustment < 0:
         confidence_adjustment = 0
@@ -812,7 +793,7 @@ def readLetterImproved(letter, min_confidence, locked_tile_positions):
             letter_x_grid, letter_y_grid = pos
             logging.debug(f"Letter {orig_letter} may reside in position ({letter_x_grid}, {letter_y_grid})")
             logging.debug("Confidence in letter " + letter + ": " + str(0.99 - confidence_adjustment))
-            tile_adding = Tile(orig_letter, 0.99 - confidence_adjustment + problem_adjustment)
+            tile_adding = Tile(orig_letter, 0.99 - confidence_adjustment)
             final_pos_list.append((tile_adding, letter_x_grid, letter_y_grid))
                 
         return final_pos_list
@@ -933,60 +914,6 @@ def clickAbnormalTiles():#clicks on the tiles which are gems, plagued, smashed, 
                 abnormal_count = abnormal_count + 1
     print(f"{abnormal_count} abnormal tiles")
     return abnormal_count
-
-def getLetterAdjustment(letter):
-
-
-
-    #TODO: FOR TESTING ONLY
-    return 0
-
-    gameType = inGame()
-    while not gameType:
-        time.sleep(1)
-        gameType = inGame()
-
-    if gameType == 1:
-        #tooMany = ['c', 'e', 'l', 'p', 'r', 't', 'u']#letters are (incorrectly) recognized too often without this adjustment
-        #bitTooMany = ['a', 'b', 'd', 'f', 'h', 'j', 'k', 'm', 'n', 'q', 's','x', 'y', 'z']#slight adjustment
-
-        #bitNotEnough = ['i','o']
-        #notEnough = ['k', 'p', 'w']#letters aren't recognized enough if this adjustment isn't made
-
-        #if letter in bitTooMany:
-        #    return -0.17
-        #elif letter in tooMany:
-        #    return -0.20
-
-
-        #elif letter in bitNotEnough:
-        #    return 0.03
-        #elif letter in notEnough:
-        #    return 0.08
-
-        #elif letter == 'g':
-        #    return -0.21
-
-        notEnough = ['i', 'o']
-        tooMany = ['g']
-
-        if letter in notEnough:
-            return 0.18
-        elif letter in tooMany:
-            return -0.1
-
-    if gameType == 2:#looks like adjustment is only needed for Bookworm Adventures 1
-        #tooMany = []
-        #bitTooMany = []
-
-        #notEnough = ['i']
-
-        #if letter == 'i':
-        #    return 0.65
-
-        pass
-
-    return 0
 
 def getMostConfidentLetterGrid(letter, letterBoard):#return the grid location of the letter with the highest confidence
                                                     
@@ -1215,4 +1142,4 @@ def main():
 
 if __name__ == '__main__':
     main()
-   
+  
