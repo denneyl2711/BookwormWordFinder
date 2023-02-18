@@ -51,7 +51,7 @@ INFO:root:
 
 INFO:root:Trying to add letter 'e' in position [3, 0]
 INFO:root:            Counted letter 2
-INFO:root:\
+INFO:root:
 [  '-'  '-'  '-'  'e' ]
 [  '-'  '-'  '-'  '-' ]
 [  '-'  '-'  '-'  '-' ]
