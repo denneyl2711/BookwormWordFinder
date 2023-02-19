@@ -113,7 +113,6 @@ class Tile:
                tile = args[0]
                self.letter = tile.get_letter()
                self.confidence = tile.get_confidence()
-               print("tile copy constructor")
 
            if isinstance(args[0], str) and (isinstance(args[1], float) or isinstance(args[1], int)):#if (letter, confidence) is argument
                self.letter = args[0]
