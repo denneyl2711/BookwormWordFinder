@@ -1,6 +1,9 @@
 # Bookworm Reader/Speller
 ## Plays Bookworm Adventures 1 and 2. Reads the game board, finds the longest possible word, and attacks the enemy with that word.
 
+## Here's a demo video!
+https://www.youtube.com/watch?v=-KNqqOVVICE 
+
 ### Reading Letters
 ![bookwormGif2](https://user-images.githubusercontent.com/60581053/219832218-ad66381c-6b44-40a5-a461-1262a8e31175.gif)
 
