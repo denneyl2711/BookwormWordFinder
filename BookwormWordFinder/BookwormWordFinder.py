@@ -1,6 +1,6 @@
 #The goal of this program is to read a 4x4 grid of letters on the screen, find the longest possible word from those letters, and click those letters
 #This program is designed to be compatible with both Bookworm Adventures 1 and 2, although it is more reliable with the second version
-#The program reads letters using image recognition from PIL/pyautogui, or with manual user input
+#The program reads letters using image recognition from pyautogui, or with manual user input
 
 #How does the letter reading work?
     #The program takes advantage of pyautogui's variable tolerance when searching for images.
@@ -42,14 +42,10 @@
 #List of 3,000 most common English words taken from https://www.ef.edu/english-resources/english-vocabulary/top-3000-words/
 #List of all English words taken from https://raw.githubusercontent.com/dwyl/english-words/master/words_alpha.txt
 
-import re
-import random
+import re #for regex
 import pyautogui
-import keyboard
-from pynput.keyboard import Listener, KeyCode
 import win32api
 import win32con
-from pynput.mouse import Controller, Button
 from threading import Thread
 import time
 import logging
@@ -57,13 +53,6 @@ import copy
 
 import concurrent.futures
 from multiprocessing.pool import Pool
-
-# cv2.cvtColor takes a numpy ndarray as an argument
-import numpy as nm
-import pytesseract
-# importing OpenCV
-import cv2
-from PIL import ImageGrab
 
 logging.basicConfig(level = logging.DEBUG)
 #INFO prints out board states as the program reads the board, 
@@ -372,31 +361,40 @@ def spellWord(word, letterBoard, inOrder):
             #find the letter that has the highest confidence rating, then click that one
             mostConfidentLetter = getMostConfidentLetterGrid(letter, tempLetterBoard)
 
-            if mostConfidentLetter[0] == '-':
+             #mostConfidentLetter stores a tuple with (Tile, grid_x, grid_y)
+            if mostConfidentLetter[0].get_letter() == '-':
                 logging.warning("         NOT ENOUGH LETTERS!")    
                 return (None, None)
-
-            #mostConfidentLetter stores a tuple with (('letter', confidence), grid_x, grid_y)
-            info = clickLetterWithCoords(mostConfidentLetter[1], mostConfidentLetter[2])
-            list_of_clicks.append((info[0], info[1]))
+           
+            
+            list_of_clicks.append(clickLetterWithCoords(mostConfidentLetter[1], mostConfidentLetter[2]))
             
             
     else:
+        tempLetterBoard = copy.deepcopy(letterBoard)
         for letter in word:
-            if letter not in letterBoard.get_letters():
-                #TODO: PROGRAM BREAKS HERE FOR SOME MANUAL & UNORDERED INPUT
-                    #I believe this is a qu issue
-                info = clickLetterForce('?')
-                print(f"letter {letter} not found, getting '?' instead")
-                letter = letter.upper()
+            if letter not in tempLetterBoard.get_letters():
+                gameType = inGame()
+                if not gameType:
+                    time.sleep(1)
+                    gameType = inGame()
+
+                if gameType == 1:
+                    print(f"Unable to spell {word}, missing letter '{letter}'")
+                    break
+                if gameType == 2:
+                    print(f"letter {letter} not found, getting '?' instead")
+                    info = clickLetterForce('?')
+                    letter = letter.upper()
             else:
                 info = clickLetterForce(letter)#info stores a tuple with (confidence rating, x position of click, y position of click)
             average_confidence = average_confidence + info[0]
             list_of_clicks.append((info[1], info[2]))
 
             #modify letterBoard
-            grid_x, grid_y = clickToGrid(info[1], info[2])
-            letterBoard.board[grid_y][grid_x] = Tile(letter, 1)
+            grid_y, grid_x = clickToGrid(info[1], info[2])
+            tempLetterBoard.board[grid_y][grid_x] = Tile('-', 0)
+            print(tempLetterBoard)
 
             count = count + 1
 
@@ -447,67 +445,6 @@ def clickLetterForce(letter):
      
     mouseSetAndClick(new_pos_x, new_pos_y)
     return ((1.0 - confidence_adjustment, new_pos_x, new_pos_y))
-
-def clickLetterMaybe(letter, min_confidence, locked_tile_positions): #will not click if the confidence rating is too low (0.8)
-                                                    #baseline_confidence decreases gradually as the program loops over the same board multiple times
-                                                    #with each pass, confidence decreases
-                                                    #returns (confidence, pos_x, pos_y) as pixel values, not grid values 
-                                                    #ex. (0.67, 356, 258)
-
-
-    gameType = inGame()
-    while not gameType:
-        time.sleep(1)
-        gameType = inGame()
-
-    x_min, y_min, x_max, y_max, offset, step, SCALER = getBoundaries(gameType)
-
-    if gameType == 1:
-        append = ".png"#this is appened to the letter so the program can search for the file name
-
-    if gameType == 2:
-        append = ".png"#this is appened to the letter so the program can search for the file name
-
-    boundaries = (x_min - offset, y_min - offset, x_max - x_min + offset, y_max - y_min + offset)
-
-        
-    if letter == '?':
-        letter = "question"#have to make this change because you can't name a file '?2.png'
-
-    letterName = letter + append
-    confidence_adjustment = 0.9 - min_confidence
-
-    if confidence_adjustment < 0:
-        confidence_adjustment = 0
-
-    #right side of this inequality determines how far the program goes before giving up
-    #the higher the right side is, the further it allows its guesses to stray from the confidence
-    pos = None
-    while(1 - confidence_adjustment > min_confidence and pos == None):#DOES NOT have to click a letter
-        logging.debug(f"checking {letter} with confidence {round(1.0 - confidence_adjustment, 2)}...")
-        pos = pyautogui.locateOnScreen(letterName, region = boundaries, confidence = 1.0 - confidence_adjustment)
-
-        if pos!= None:
-            logging.debug(f"                Found letter {letter} with confidence {round(1.0 - confidence_adjustment, 2)}!")
-            
-        confidence_adjustment = confidence_adjustment + 0.01 #slowly decreases the confidence of the check
-
-    if pos != None:
-        letter_x_grid, letter_y_grid = posToGrid(pos)
-
-        #if letter is on a locked tile, discard it
-        if ((letter_x_grid, letter_y_grid)) in locked_tile_positions:
-            logging.debug("         That's a locked tile!")
-            return ((1.0 - confidence_adjustment, 0, 0)) #default return values
-
-        else:
-            logging.debug("Confidence in letter " + letter + ": " + str(1.0 - confidence_adjustment))
-    
-            mouseSetAndClick(new_pos_x, new_pos_y)#because window resizing does weird things
-            return ((1.0 - confidence_adjustment, new_pos_x, new_pos_y))
-
-    else:#did not find letter, return confidence and default position values
-        return ((1.0 - confidence_adjustment, 0, 0))
 
 def clickLetterWithCoords(grid_coord_x, grid_coord_y):
 
@@ -643,8 +580,10 @@ def readGrid(letterBoard):#remove abnormal tiles, read the normal ones, then rea
     abnormal_count = clickAbnormalTiles()
     letterCount = 0
     min_confidence = 0.85
+    comparisons = 0
 
-    letterCount = readLettersImproved(letterBoard, min_confidence, letterCount, abnormal_count, locked_tile_positions)
+    start_read = time.perf_counter()
+    letterCount, comparisons = readLettersImproved(letterBoard, min_confidence, letterCount, abnormal_count, locked_tile_positions, comparisons)
 
     clearBoard()
     #remove the normal tiles before reading the gems
@@ -655,20 +594,22 @@ def readGrid(letterBoard):#remove abnormal tiles, read the normal ones, then rea
                 if letterBoard.board[col][row].get_confidence() != 0:
                     clickLetterWithCoords(row, col)
 
-    print("Before reading abnormal letters: ...")
+    print("Before reading abnormal letters: .............................................................")
     print(letterBoard)
     print()
 
    
     min_confidence = 0.75 #start at a lower confidence because abnormal tiles won't be recognized at higher confidences anyway
-    readLettersImproved(letterBoard, min_confidence, letterCount, 0, locked_tile_positions)
+    comparisons = readLettersImproved(letterBoard, min_confidence, letterCount, 0, locked_tile_positions, comparisons)[1]
 
+    end_read = time.perf_counter()
+    print(f"\n\nTook {end_read - start_read} seconds and {comparisons} image comparisons to read the board")
     print(letterBoard)
 
     return locked_tile_positions, abnormal_count
 
 
-def readLettersImproved(letterBoard, min_confidence, letterCount, abnormal_count, locked_tile_positions):#try to read letters at confidence .95, then 80,... etc.
+def readLettersImproved(letterBoard, min_confidence, letterCount, abnormal_count, locked_tile_positions, comparisons):#try to read letters at confidence .95, then 80,... etc.
                                         #if match, then decrease in confidence until no more match within that letter
                                         #should decrease the number of unneeded checks
     gameType = inGame()
@@ -689,10 +630,13 @@ def readLettersImproved(letterBoard, min_confidence, letterCount, abnormal_count
         win32api.SetCursorPos((30, 30)) 
 
         with Pool() as pool:
-           for result in pool.starmap(readLetterImproved, items):
-               if result!= None:
-                   for tile in result:
-                        potentialTiles.append(tile)
+           for results in pool.starmap(readLetterImproved, items):
+              result, comparison_count = results
+              comparisons += comparison_count
+
+              if result is not None:
+                  for tile in result:
+                      potentialTiles.append(tile)
 
         #sort by confidence level and select the most confident
         potentialTiles.sort(reverse = True)
@@ -732,7 +676,7 @@ def readLettersImproved(letterBoard, min_confidence, letterCount, abnormal_count
                     if potentialTile[1] == grid_x and potentialTile[2] == grid_y:
                         potentialTiles.remove(potentialTile)
 
-    return letterCount
+    return letterCount, comparisons
         
 def readLetterImproved(letter, min_confidence, locked_tile_positions):
     
@@ -762,6 +706,7 @@ def readLetterImproved(letter, min_confidence, locked_tile_positions):
 
     pos = 1
     pos_list = []
+    comparisons = 0
     while(pos != None):#searches until it doesn't find a match
         logging.debug(f"checking {orig_letter} with confidence {round(1.0 - confidence_adjustment, 2)}...")
         pos = pyautogui.locateOnScreen(letterName, region = boundaries, confidence = 1.0 - confidence_adjustment)
@@ -775,7 +720,7 @@ def readLetterImproved(letter, min_confidence, locked_tile_positions):
 
                 if pos_x_grid == position_x_grid and pos_y_grid == position_y_grid:
                    logging.debug(f"Removed duplicate in readLetterImproved() ['{letter}', {pos_x_grid}, {pos_y_grid}]!")
-                   break
+                   break#out of the for loop
             else:
                 if not ((pos_x_grid, pos_y_grid)) in locked_tile_positions:
                     pos_list.append((pos_x_grid, pos_y_grid))
@@ -783,8 +728,9 @@ def readLetterImproved(letter, min_confidence, locked_tile_positions):
 
                 else: #if letter is on a locked tile, discard it
                     logging.info("         That's a locked tile!")
-                    break
-        confidence_adjustment = confidence_adjustment - 0.01 #slowly decreases the confidence of the check
+                    break#out of the pos check
+        confidence_adjustment = confidence_adjustment - 0.01 #slowly INCREASES the confidence of the check
+        comparisons += 1
 
     if pos_list:
         final_pos_list = []
@@ -795,19 +741,16 @@ def readLetterImproved(letter, min_confidence, locked_tile_positions):
             tile_adding = Tile(orig_letter, 0.99 - confidence_adjustment)
             final_pos_list.append((tile_adding, letter_x_grid, letter_y_grid))
                 
-        return final_pos_list
+        return final_pos_list, comparisons
 
     else:#did not find letter
-        return None
+        return (None, comparisons)
 
 def checkForLocked():
     #loop through all grid tiles
     #then, if the color of the click spot is the same before and after the click, tile didn't move so it must be locked
 
     color2DArray = [[list((0, 0, 0)) for i in range (4)] for j in range(4)]
-
-    locked_count = 0
-    locked_points = []
 
     gameType = inGame()
     while not gameType:
@@ -830,47 +773,55 @@ def checkForLocked():
         x_max -= 50
         y_max -= 90
 
-    col = 0#scan from top to bottom instead of left to right
-    for y in range(y_min, y_max, step):
-        row = 0
-        for x in range(x_min, x_max, step):
+    good_scan = False #program might start while board is constrained (e.g. enemy attack animation)
+    while not good_scan:
+        clearBoard()
+        locked_tiles_positions = []
 
-            click_x = find_x(x)
-            click_y = find_y(y)
-            logging.debug("Entering info for cell (" + str(row) + " , " + str(col) + ")")
-            color2DArray[col][row] = list((pyautogui.pixel(x, y)))
-            logging.debug(f"color is {color2DArray[col][row]}")
-
-            #win32api.SetCursorPos((click_x, click_y))
-            #time.sleep(0.5)
-
-            mouseSetAndClick(click_x, click_y)
-            row = row + 1
-        print()
-        col = col + 1
-
-
-    time.sleep(0.3)#program clicks so fast it needs to wait a bit before reading colors here
-
-
-    col = 0
-    for x in range(x_min, x_max, step):
-        row = 0
+        col = 0#scan from top to bottom instead of left to right
         for y in range(y_min, y_max, step):
-            #color = color2DArray[col][row] #remove the not in the color check below if choosing this color option
-            color = (0, 0, 0)
+            row = 0
+            for x in range(x_min, x_max, step):
 
-            other_color = pyautogui.pixel(x, y)
-            logging.info(f"  expected {color} and saw {other_color} in position (" + str(col) + ", " + str(row) + ")")
+                click_x = find_x(x)
+                click_y = find_y(y)
+                logging.debug("Entering info for cell (" + str(row) + " , " + str(col) + ")")
+                color2DArray[col][row] = list((pyautogui.pixel(x, y)))
+                logging.debug(f"color is {color2DArray[col][row]}")
 
-            if not pyautogui.pixelMatchesColor(x, y, (color), tolerance = 35):
-                locked_count = locked_count + 1
-                locked_points.append((col, row))
-                print(f"Found locked tile in position (" + str(col) + ", " + str(row) + ")")
-            row = row + 1
-        col = col + 1
+                #win32api.SetCursorPos((click_x, click_y))
+                #time.sleep(0.5)
 
-    return locked_points
+                mouseSetAndClick(click_x, click_y)
+                row = row + 1
+            print()
+            col = col + 1
+
+
+        time.sleep(0.3)#program clicks so fast it needs to wait a bit before reading colors here
+
+
+        col = 0
+        for x in range(x_min, x_max, step):
+            row = 0
+            for y in range(y_min, y_max, step):
+                #color = color2DArray[col][row] #remove the not in the color check below if choosing this color option
+                color = (0, 0, 0)
+
+                other_color = pyautogui.pixel(x, y)
+                logging.info(f"  expected {color} and saw {other_color} in position (" + str(col) + ", " + str(row) + ")")
+
+                if not pyautogui.pixelMatchesColor(x, y, (color), tolerance = 35):
+                    locked_tiles_positions.append((col, row))
+                    print(f"Found locked tile in position (" + str(col) + ", " + str(row) + ")")
+                row = row + 1
+            col = col + 1
+        if len(locked_tiles_positions) < 7:
+            good_scan = True
+        else:
+            logging.warning("Error finding locked tiles, trying again-------------------------------------------------------")
+
+    return locked_tiles_positions
     
 def clickAbnormalTiles():#clicks on the tiles which are gems, plagued, smashed, or otherwise discolored
     abnormal_count = 0
@@ -1027,7 +978,7 @@ def mouseSetAndClickCoords(coords):
 #&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
 
 def main():
-    locked_tile_positions = []
+    locked_tiles_positions = []
     abnormal_count = -1
 
     letterBoard = LetterBoard()
@@ -1065,11 +1016,7 @@ def main():
             time.sleep(1)
             gameType = inGame()
 
-        clearBoard()
-        start1 = time.perf_counter()
         locked_tiles_positions, abnormal_count = readGrid(letterBoard)
-        end1 = time.perf_counter()
-        print(f"Took {end1 - start1} seconds to read the board\n\n")
 
         #remove '-' chars from input
         autoInput = ""
@@ -1130,8 +1077,8 @@ def main():
 
         time.sleep(TIME_BETWEEN_ATTACKS)
     
-    
-    logging.info(f"This board has {len(locked_tile_positions)} locked tiles and {abnormal_count} abnormal tiles")
+    if abnormal_count != -1: 
+        logging.info(f"This board has {len(locked_tiles_positions)} locked tiles and {abnormal_count} abnormal tiles")
     print()
     print("Attack successful! ----> " + attack_word)
     print(f"Took {numberOfAttempts} attempts")
