@@ -509,3 +509,65 @@
 #        pass
 
 #    return 0
+
+
+#def clickLetterMaybe(letter, min_confidence, locked_tile_positions): #will not click if the confidence rating is too low (0.8)
+#                                                    #baseline_confidence decreases gradually as the program loops over the same board multiple times
+#                                                    #with each pass, confidence decreases
+#                                                    #returns (confidence, pos_x, pos_y) as pixel values, not grid values 
+#                                                    #ex. (0.67, 356, 258)
+
+
+#    gameType = inGame()
+#    while not gameType:
+#        time.sleep(1)
+#        gameType = inGame()
+
+#    x_min, y_min, x_max, y_max, offset, step, SCALER = getBoundaries(gameType)
+
+#    if gameType == 1:
+#        append = ".png"#this is appened to the letter so the program can search for the file name
+
+#    if gameType == 2:
+#        append = ".png"#this is appened to the letter so the program can search for the file name
+
+#    boundaries = (x_min - offset, y_min - offset, x_max - x_min + offset, y_max - y_min + offset)
+
+        
+#    if letter == '?':
+#        letter = "question"#have to make this change because you can't name a file '?2.png'
+
+#    letterName = letter + append
+#    confidence_adjustment = 0.9 - min_confidence
+
+#    if confidence_adjustment < 0:
+#        confidence_adjustment = 0
+
+#    #right side of this inequality determines how far the program goes before giving up
+#    #the higher the right side is, the further it allows its guesses to stray from the confidence
+#    pos = None
+#    while(1 - confidence_adjustment > min_confidence and pos == None):#DOES NOT have to click a letter
+#        logging.debug(f"checking {letter} with confidence {round(1.0 - confidence_adjustment, 2)}...")
+#        pos = pyautogui.locateOnScreen(letterName, region = boundaries, confidence = 1.0 - confidence_adjustment)
+
+#        if pos!= None:
+#            logging.debug(f"                Found letter {letter} with confidence {round(1.0 - confidence_adjustment, 2)}!")
+            
+#        confidence_adjustment = confidence_adjustment + 0.01 #slowly decreases the confidence of the check
+
+#    if pos != None:
+#        letter_x_grid, letter_y_grid = posToGrid(pos)
+
+#        #if letter is on a locked tile, discard it
+#        if ((letter_x_grid, letter_y_grid)) in locked_tile_positions:
+#            logging.debug("         That's a locked tile!")
+#            return ((1.0 - confidence_adjustment, 0, 0)) #default return values
+
+#        else:
+#            logging.debug("Confidence in letter " + letter + ": " + str(1.0 - confidence_adjustment))
+    
+#            mouseSetAndClick(new_pos_x, new_pos_y)#because window resizing does weird things
+#            return ((1.0 - confidence_adjustment, new_pos_x, new_pos_y))
+
+#    else:#did not find letter, return confidence and default position values
+#        return ((1.0 - confidence_adjustment, 0, 0))
