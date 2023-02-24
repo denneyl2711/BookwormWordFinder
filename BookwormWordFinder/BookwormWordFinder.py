@@ -433,7 +433,6 @@ def clickLetterForce(letter):
     while(pos == None):#forces it to find a letter, may click wrong letter
         logging.debug(f"checking {letter} with confidence {round(1.0 - confidence_adjustment, 2)}...")
         pos = pyautogui.locateOnScreen(letterName, region = boundaries, confidence = 1.0 - confidence_adjustment)
-        #pos = pyautugui.locateOnScreen(something.png, region, confidence)
         confidence_adjustment = confidence_adjustment + 0.01 #slowly decreases the confidence of the check
 
     print("Confidence in letter " + letter + ": " + str(1.0 - confidence_adjustment))
