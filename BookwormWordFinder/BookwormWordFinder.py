@@ -216,14 +216,14 @@ def setup(autoInput, boardLetters):
 
     start = time.perf_counter()
     num_removed = 0
+    pre_size = len(english_words)
+
     if not wildTile:
         pattern = r'^[' + tempBoardLetters + ']+$'
         regex = re.compile(pattern)
 
-        pre_size = len(english_words)
         filtered_words = list(filter(regex.search, english_words))
-        post_size = len(filtered_words)
-        num_removed += pre_size - post_size
+        
     else:
         filtered_words = list()
         #run the same test 26 times with the ? being replaced with a new letter every time
@@ -238,35 +238,29 @@ def setup(autoInput, boardLetters):
 
             regex = re.compile(pattern)
 
-            pre_size = len(english_words)
+            
             temp_filtered_words = list(filter(regex.search, english_words))
-            post_size = len(temp_filtered_words)
-            num_removed += pre_size - post_size
-
+           
             temp_filtered_words.sort(key =len, reverse = True) #sort by length, longer words first
 
             while len(temp_filtered_words) > 500:
                 del temp_filtered_words[-1]
-                #num_removed += 1
-
-            #need to append another letter for every time the program loops through the ? list
-            #then remove/decrement that letter at the end
-
-            #Make tempLetterBoard using the letters (except for ?), then append each individual letter on every pass
-            tempLetterBoard = LetterBoard(tempBoardLetters + letter)
 
             filtered_words = list(set(filtered_words) | set(temp_filtered_words))
             #print(f"list is now {len(filtered_words)} words long")
 
+    post_size = len(filtered_words)
+    num_removed += pre_size - post_size
     end = time.perf_counter()
+
     print(f"Took {end-start} seconds to run regex, removing {num_removed} words")
         
-
     filtered_words.sort(key =len, reverse = True) #sort by length, longer words first
 
     while len(filtered_words) > 10000:
         del filtered_words[-1]
 
+    print(f"\nOriginal list was {len(english_words)} words long")
     print(f"List shortened to {len(filtered_words)} words long")
 
     return (filtered_words, boardLetters)
@@ -306,8 +300,6 @@ def verify_word_new(word, letterBoard):
                 letters.remove('?')
             except:
                 return False
-        
-        
        
     return True
 
@@ -320,7 +312,8 @@ def findLongestWords(autoInput, boardLetters):
     verify_words_new(filtered_words, tempLetterBoard)
     end = time.perf_counter()
 
-    
+    print(f"List is now {len(filtered_words)} words long")
+ 
     return (filtered_words, boardLetters)
 
 #qu is stored as a single tile in the Bookworm Games, so this function helps deal with that
