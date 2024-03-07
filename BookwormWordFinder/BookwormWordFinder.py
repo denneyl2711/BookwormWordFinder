@@ -54,6 +54,10 @@ import copy
 import concurrent.futures
 from multiprocessing.pool import Pool
 
+import pyscreeze
+pyscreeze.USE_IMAGE_NOT_FOUND_EXCEPTION = False
+
+
 logging.basicConfig(level = logging.DEBUG)
 #INFO prints out board states as the program reads the board, 
     #also the number of words removed while searching for longest word
@@ -408,7 +412,7 @@ def clickLetterForce(letter):
 
     x_min, y_min, x_max, y_max, offset, step, SCALER = getBoundaries(gameType)
     if gameType == 1:
-        append = ".png"
+        append = ".pngh"
 
     if gameType == 2:
         append = "2.png"
