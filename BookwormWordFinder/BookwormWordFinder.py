@@ -412,7 +412,7 @@ def clickLetterForce(letter):
 
     x_min, y_min, x_max, y_max, offset, step, SCALER = getBoundaries(gameType)
     if gameType == 1:
-        append = ".pngh"
+        append = ".png"
 
     if gameType == 2:
         append = "2.png"
